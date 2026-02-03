@@ -1,0 +1,60 @@
+# Dependências
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ambiente
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory
+coverage/
+.nyc_output
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Backup
+*.bak
+*.backup
+*.tar.gz
+*.zip
+
+# Ngrok
+ngrok.log
+server.log
+
+# Railway config (local)
+railway-config.json
+railway-credentials.json
+railway.json
+
+# Sensíveis
+*.key
+*.pem
+*.crt

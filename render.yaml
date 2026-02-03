@@ -1,0 +1,49 @@
+# render.yaml
+# Configuração para deploy automático no Render.com
+# Documentação: https://render.com/docs/yaml-spec
+
+services:
+  # Serviço web principal (Webhook Z-API)
+  - type: web
+    name: webhook-zapi
+    runtime: node
+    region: ohio  # ou são paulo se disponível
+    repo: https://github.com/[SEU-USUARIO]/webhook-zapi
+    branch: main
+    plan: free  # free tier: 750h/mês
+    
+    # Configuração build
+    buildCommand: npm install
+    startCommand: npm start
+    
+    # Variáveis de ambiente (sensíveis via dashboard)
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      # Z-API config (adicionar via dashboard)
+      # - key: ZAPI_TOKEN
+      #   sync: false
+      # - key: ZAPI_INSTANCE
+      #   sync: false
+    
+    # Health check
+    healthCheckPath: /health
+    autoDeploy: true
+    
+    # Scaling (free tier limitado)
+    numInstances: 1
+
+  # Banco de dados PostgreSQL (opcional - pode adicionar depois)
+  - type: pgsql
+    name: clientes-db
+    region: ohio
+    plan: free  # free: 1GB storage, conexões limitadas
+    ipAllowList: []
+    # Não incluído inicialmente - pode adicionar quando migrar do SQLite
+
+# Grupos (para organização)
+# groups:
+#   - name: wdespachante
+#     region: ohio
