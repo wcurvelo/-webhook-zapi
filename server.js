@@ -10,7 +10,8 @@ const RENDER_KEEP_ALIVE = process.env.NODE_ENV === 'production';
 const KEEP_ALIVE_INTERVAL = 5 * 60 * 1000; // 5 minutos
 
 // Configuração do banco de dados
-const DB_PATH = process.env.DB_PATH || '/home/wcurvelo/railway-project/sistema-clientes/clientes.db';
+// Usar /tmp para compatibilidade com Render (persistente entre deploys)
+const DB_PATH = process.env.DB_PATH || '/tmp/clientes.db';
 
 // Conectar ao banco de dados
 const db = new sqlite3.Database(DB_PATH, (err) => {
