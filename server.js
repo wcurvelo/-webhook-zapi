@@ -1,4 +1,4 @@
-// server-com-resposta.js - Webhook com análise e resposta automática
+// server-auto-enabled.js - Webhook com resposta automática ATIVADA
 const express = require('express');
 const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
@@ -13,13 +13,13 @@ const KEEP_ALIVE_INTERVAL = 5 * 60 * 1000; // 5 minutos
 // Configuração do banco de dados
 const DB_PATH = process.env.DB_PATH || '/tmp/clientes.db';
 
-// Configuração Z-API
+// Configuração Z-API - RESPOSTA AUTOMÁTICA ATIVADA
 const ZAPI_CONFIG = {
   INSTANCE_ID: process.env.ZAPI_INSTANCE_ID || '***REMOVED***',
   TOKEN: process.env.ZAPI_TOKEN || '***REMOVED***',
   API_URL: process.env.ZAPI_API_URL || 'https://api.z-api.io/instances/***REMOVED***/token/***REMOVED***',
   CLIENT_TOKEN: process.env.ZAPI_CLIENT_TOKEN || '***REMOVED***',
-  RESPONSE_ENABLED: process.env.RESPONSE_ENABLED === 'true' || false // Por padrão desabilitado
+  RESPONSE_ENABLED: true // ATIVADO para resposta automática
 };
 
 // Conectar ao banco de dados
@@ -82,7 +82,7 @@ function criarTabelaMensagens() {
 app.use(bodyParser.json({ limit: '10mb', strict: false }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
-// Logging melhorado para produção
+// Logging detalhado
 const log = (message, data = null) => {
   const timestamp = new Date().toISOString();
   if (data && typeof data === 'object') {
@@ -114,7 +114,7 @@ function analisarMensagem(mensagemTexto) {
   
   // Inicializar resultados
   let tipoServico = 'outros';
-  let urgencia = 3; // Padrão: média
+  let urgencia = 3;
   let acaoSugerida = 'escalar_humano';
   let templateResposta = 'Olá! Recebemos sua mensagem. Um especialista entrará em contato em breve.';
   let confianca = 0.3;
@@ -135,7 +135,7 @@ function analisarMensagem(mensagemTexto) {
   // Detectar urgência
   for (const palavra of keywords.urgencia) {
     if (mensagem.includes(palavra)) {
-      urgencia = 8; // Alta urgência
+      urgencia = 8;
       acaoSugerida = 'responder_imediato';
       break;
     }
@@ -162,18 +162,6 @@ function analisarMensagem(mensagemTexto) {
       confianca = 0.9;
       break;
     }
-  }
-  
-  // Ajustar complexidade baseada no tipo de serviço
-  let complexidade = 5;
-  if (tipoServico === 'transferencia' || tipoServico === 'ipva') {
-    complexidade = 7;
-  } else if (tipoServico === 'licenciamento' || tipoServico === 'multas') {
-    complexidade = 6;
-  } else if (tipoServico === 'crlv') {
-    complexidade = 4;
-  } else if (tipoServico === 'consulta') {
-    complexidade = 3;
   }
   
   // Gerar resposta baseada no tipo de serviço
@@ -203,7 +191,7 @@ function analisarMensagem(mensagemTexto) {
   return {
     tipo_servico: tipoServico,
     urgencia: urgencia,
-    complexidade: complexidade,
+    complexidade: 5,
     acao_sugerida: acaoSugerida,
     template_resposta: templateResposta,
     confianca: Math.round(confianca * 100) / 100
@@ -277,6 +265,97 @@ async function enviarRespostaZAPI(telefone, mensagem) {
   }
 }
 
+// Função melhorada para extrair dados da mensagem Z-API
+function extrairDadosZAPI(body) {
+  try {
+    log('DEBUG: Payload completo recebido:', body);
+    
+    // Tentativa 1: Formato mais comum da Z-API
+    if (body?.data?.from) {
+      const result = {
+        instanceId: body.instance || body.data.instance || 'unknown',
+        type: body.type || 'ReceivedCallback',
+        from: body.data.from,
+        text: body.data.text || body.data.body || body.data.message || body.data.content || '',
+        messageId: body.data.messageId || body.data.id || '',
+        timestamp: body.data.timestamp || body.data.date || new Date().toISOString(),
+        rawBody: JSON.stringify(body).substring(0, 500) + '...'
+      };
+      log('DEBUG: Extraído (formato 1):', result);
+      return result;
+    }
+    
+    // Tentativa 2: Formato alternativo (dados diretos)
+    if (body?.from) {
+      const result = {
+        instanceId: body.instanceId || body.instance || 'unknown',
+        type: body.type || 'ReceivedCallback',
+        from: body.from,
+        text: body.body || body.text || body.message || body.content || '',
+        messageId: body.messageId || body.id || '',
+        timestamp: body.timestamp || body.date || new Date().toISOString(),
+        rawBody: JSON.stringify(body).substring(0, 500) + '...'
+      };
+      log('DEBUG: Extraído (formato 2):', result);
+      return result;
+    }
+    
+    // Tentativa 3: Qualquer campo que possa ser texto
+    const possibleTextFields = ['text', 'body', 'message', 'content', 'msg'];
+    let foundText = '';
+    let foundFrom = '';
+    
+    for (const field of possibleTextFields) {
+      if (body[field]) {
+        foundText = body[field];
+        break;
+      }
+      if (body.data && body.data[field]) {
+        foundText = body.data[field];
+        break;
+      }
+    }
+    
+    // Tentar encontrar número de telefone
+    const possibleFromFields = ['from', 'phone', 'sender', 'number'];
+    for (const field of possibleFromFields) {
+      if (body[field]) {
+        foundFrom = body[field];
+        break;
+      }
+      if (body.data && body.data[field]) {
+        foundFrom = body.data[field];
+        break;
+      }
+    }
+    
+    const result = {
+      instanceId: body?.instance || body?.data?.instance || 'unknown',
+      type: body?.type || 'unknown',
+      from: foundFrom || 'unknown',
+      text: foundText || '(sem texto)',
+      messageId: body?.messageId || body?.data?.messageId || body?.id || body?.data?.id || '',
+      timestamp: body?.timestamp || body?.data?.timestamp || body?.date || body?.data?.date || new Date().toISOString(),
+      rawBody: JSON.stringify(body).substring(0, 500) + '...'
+    };
+    
+    log('DEBUG: Extraído (formato 3 - fallback):', result);
+    return result;
+    
+  } catch (error) {
+    log('ERRO ao extrair dados Z-API:', error.message);
+    return {
+      instanceId: 'error',
+      type: 'error',
+      from: 'error',
+      text: `Erro ao processar mensagem: ${error.message}`,
+      messageId: '',
+      timestamp: new Date().toISOString(),
+      rawBody: JSON.stringify(body || {}).substring(0, 500) + '...'
+    };
+  }
+}
+
 // Função para salvar mensagem no banco
 function salvarMensagemNoBanco(mensagemData, analise, callback) {
   const {
@@ -322,64 +401,10 @@ function salvarMensagemNoBanco(mensagemData, analise, callback) {
       callback(err, null);
     } else {
       const insertedId = this.lastID;
-      log('Mensagem salva no banco', { id: insertedId, telefone: from, tipo: analise.tipo_servico });
+      log('Mensagem salva no banco', { id: insertedId, telefone: from, tipo: analise.tipo_servico, texto_preview: text.substring(0, 50) });
       callback(null, insertedId);
     }
   });
-}
-
-// Função para extrair dados da mensagem Z-API
-function extrairDadosZAPI(body) {
-  try {
-    // Formato Z-API padrão
-    if (body?.data?.from && (body?.data?.text || body?.data?.body)) {
-      return {
-        instanceId: body.instance || body.data.instance,
-        type: body.type || 'ReceivedCallback',
-        from: body.data.from,
-        text: body.data.text || body.data.body || '',
-        messageId: body.data.messageId || body.data.id,
-        timestamp: body.data.timestamp || new Date().toISOString(),
-        rawBody: JSON.stringify(body).substring(0, 500) + '...'
-      };
-    }
-    
-    // Formato alternativo
-    if (body?.from && body?.body) {
-      return {
-        instanceId: body.instanceId || body.instance,
-        type: body.type || 'ReceivedCallback',
-        from: body.from,
-        text: body.body,
-        messageId: body.messageId || body.id,
-        timestamp: body.timestamp || new Date().toISOString(),
-        rawBody: JSON.stringify(body).substring(0, 500) + '...'
-      };
-    }
-    
-    // Fallback para dados mínimos
-    return {
-      instanceId: body?.instance || 'unknown',
-      type: body?.type || 'unknown',
-      from: body?.data?.from || body?.from || 'unknown',
-      text: body?.data?.text || body?.data?.body || body?.text || body?.body || '(sem texto)',
-      messageId: body?.data?.messageId || body?.messageId || '',
-      timestamp: new Date().toISOString(),
-      rawBody: JSON.stringify(body).substring(0, 500) + '...'
-    };
-    
-  } catch (error) {
-    console.error('Erro ao extrair dados Z-API:', error.message);
-    return {
-      instanceId: 'error',
-      type: 'error',
-      from: 'error',
-      text: `Erro ao processar mensagem: ${error.message}`,
-      messageId: '',
-      timestamp: new Date().toISOString(),
-      rawBody: '{}'
-    };
-  }
 }
 
 // Rota para receber webhooks da Z-API
@@ -392,32 +417,33 @@ app.post('/webhook', async (req, res) => {
   try {
     const { body } = req;
     
-    log('Webhook recebido da Z-API', {
+    log('=== WEBHOOK RECEBIDO ===');
+    log('Body completo (resumido):', {
       type: body?.type,
-      instanceId: body?.instance,
+      instance: body?.instance,
       hasData: !!body?.data,
-      timestamp: new Date().toISOString()
+      keys: Object.keys(body || {})
     });
     
-    // Extrair dados da mensagem
+    // Extrair dados da mensagem com logging
     const mensagemData = extrairDadosZAPI(body);
     
-    log(`Mensagem processada`, {
+    log('Dados extraídos:', {
       from: mensagemData.from,
+      text_preview: mensagemData.text.substring(0, 100),
       type: mensagemData.type,
-      textPreview: mensagemData.text.substring(0, 100),
-      length: mensagemData.text.length,
-      instance: mensagemData.instanceId
+      instanceId: mensagemData.instanceId
     });
     
     // Analisar mensagem
     analiseResultado = analisarMensagem(mensagemData.text);
     
-    log(`Análise da mensagem`, {
+    log('Análise da mensagem:', {
       tipo: analiseResultado.tipo_servico,
       urgencia: analiseResultado.urgencia,
       acao: analiseResultado.acao_sugerida,
-      confianca: analiseResultado.confianca
+      confianca: analiseResultado.confianca,
+      resposta_preview: analiseResultado.template_resposta.substring(0, 100)
     });
     
     // Salvar no banco de dados com análise
@@ -431,22 +457,43 @@ app.post('/webhook', async (req, res) => {
       }
     });
     
-    // Enviar resposta automática se configurado
-    if (ZAPI_CONFIG.RESPONSE_ENABLED && analiseResultado.confianca > 0.5) {
+    // Enviar resposta automática se configurado E confiança > 50%
+    if (ZAPI_CONFIG.RESPONSE_ENABLED && analiseResultado.confianca > 0.5 && mensagemData.from !== 'unknown' && mensagemData.from !== 'error') {
+      log('Tentando enviar resposta automática...', {
+        from: mensagemData.from,
+        confianca: analiseResultado.confianca,
+        resposta_preview: analiseResultado.template_resposta.substring(0, 50)
+      });
+      
       const resultadoEnvio = await enviarRespostaZAPI(mensagemData.from, analiseResultado.template_resposta);
       respostaEnviada = resultadoEnvio.sent;
       
       if (respostaEnviada) {
+        log('✅ Resposta enviada com sucesso via Z-API', { messageId: resultadoEnvio.messageId });
+        
         // Atualizar mensagem no banco com status de resposta enviada
         db.run("UPDATE mensagens SET resposta_enviada = ?, resposta_timestamp = CURRENT_TIMESTAMP WHERE id = ?", 
           [true, mensagemId], 
           (err) => {
             if (err) {
               log('Erro ao atualizar status de resposta', { error: err.message });
+            } else {
+              log('Status atualizado: resposta_enviada = true');
             }
           }
         );
+      } else {
+        log('❌ Falha ao enviar resposta via Z-API', { error: resultadoEnvio.error });
       }
+    } else {
+      log('Resposta automática NÃO enviada', {
+        enabled: ZAPI_CONFIG.RESPONSE_ENABLED,
+        confianca: analiseResultado.confianca,
+        from: mensagemData.from,
+        motivo: !ZAPI_CONFIG.RESPONSE_ENABLED ? 'RESPONSE_ENABLED=false' : 
+                analiseResultado.confianca <= 0.5 ? 'confiança baixa' :
+                mensagemData.from === 'unknown' || mensagemData.from === 'error' ? 'from desconhecido' : 'outro'
+      });
     }
     
     // Responder com sucesso
@@ -462,12 +509,14 @@ app.post('/webhook', async (req, res) => {
         action: analiseResultado.acao_sugerida,
         confidence: analiseResultado.confianca,
         response_generated: analiseResultado.template_resposta.substring(0, 100) + (analiseResultado.template_resposta.length > 100 ? '...' : ''),
-        response_sent: respostaEnviada
+        response_sent: respostaEnviada,
+        response_enabled: ZAPI_CONFIG.RESPONSE_ENABLED
       },
       data: {
         from: mensagemData.from,
         type: mensagemData.type,
-        textLength: mensagemData.text.length
+        textLength: mensagemData.text.length,
+        textPreview: mensagemData.text.substring(0, 50) + (mensagemData.text.length > 50 ? '...' : '')
       }
     };
     
@@ -550,27 +599,26 @@ app.post('/analyze', (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Erro interno',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENv === 'development' ? error.message : undefined
     });
   }
 });
 
-// Rota de health check (usada pelo Render e keep-alive)
+// Rota de health check
 app.get('/health', (req, res) => {
   const health = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    service: 'webhook-zapi',
-    version: '3.0.0',
+    service: 'webhook-zapi-auto',
+    version: '3.1.0',
     uptime: process.uptime(),
     memory: process.memoryUsage(),
     env: process.env.NODE_ENV || 'development',
     database: 'connected',
     zapi_enabled: ZAPI_CONFIG.RESPONSE_ENABLED,
-    features: ['message_reception', 'analysis', 'auto_response_' + (ZAPI_CONFIG.RESPONSE_ENABLED ? 'enabled' : 'disabled')]
+    features: ['message_reception', 'analysis', 'auto_response_ENABLED']
   };
   
-  // Verificar conexão com banco
   db.get("SELECT COUNT(*) as count FROM mensagens", (err, row) => {
     if (err) {
       health.database = 'error: ' + err.message;
@@ -585,65 +633,24 @@ app.get('/health', (req, res) => {
 
 // Rota de status para debug
 app.get('/status', (req, res) => {
-  db.get("SELECT COUNT(*) as total FROM mensagens", (err, row) => {
+  db.all("SELECT id, telefone, SUBSTR(mensagem, 1, 30) as preview, tipo, resposta_enviada FROM mensagens ORDER BY id DESC LIMIT 5", (err, rows) => {
     const status = {
-      service: 'Z-API Webhook v3.0',
+      service: 'Z-API Webhook v3.1',
       status: 'operational',
-      endpoints: {
-        webhook: 'POST /webhook',
-        health: 'GET /health',
-        status: 'GET /status',
-        messages: 'GET /messages',
-        analyze: 'POST /analyze',
-        send_test: 'POST /send-test'
-      },
+      auto_response: 'ENABLED',
       environment: process.env.NODE_ENV || 'development',
       timestamp: new Date().toISOString(),
+      recent_messages: err ? [] : rows,
       features: [
         'Parsing tolerante a JSON malformado',
         'Salvamento automático em SQLite',
         'Análise inteligente de mensagens',
-        'Resposta automática ' + (ZAPI_CONFIG.RESPONSE_ENABLED ? 'HABILITADA' : 'DESABILITADA'),
-        'Logging detalhado',
-        'Keep-alive automático'
-      ],
-      statistics: {
-        messagesStored: err ? 'error' : row.total,
-        database: err ? 'disconnected' : 'connected',
-        zapiResponse: ZAPI_CONFIG.RESPONSE_ENABLED ? 'enabled' : 'disabled'
-      }
+        'Resposta automática ATIVADA',
+        'Logging detalhado'
+      ]
     };
     
     res.status(200).json(status);
-  });
-});
-
-// Rota para listar mensagens recentes (debug)
-app.get('/messages', (req, res) => {
-  const limit = parseInt(req.query.limit) || 10;
-  
-  db.all(`
-    SELECT id, telefone, 
-           SUBSTR(mensagem, 1, 50) as preview,
-           tipo,
-           intencao,
-           datetime(data_recebimento) as data,
-           processed,
-           resposta_enviada,
-           SUBSTR(resposta_gerada, 1, 50) as resposta_preview
-    FROM mensagens 
-    ORDER BY data_recebimento DESC 
-    LIMIT ?
-  `, [limit], (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-    } else {
-      res.status(200).json({
-        count: rows.length,
-        messages: rows,
-        timestamp: new Date().toISOString()
-      });
-    }
   });
 });
 
@@ -653,65 +660,29 @@ app.get('/', (req, res) => {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Webhook Z-API v3.0 - WDespachante</title>
+      <title>Webhook Z-API v3.1 - WDespachante</title>
       <style>
         body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
         .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .status { padding: 20px; background: #e8f5e8; border-radius: 5px; border-left: 4px solid #4CAF50; }
-        .endpoints { margin-top: 20px; }
-        .endpoint { padding: 15px; border-left: 4px solid #2196F3; margin: 10px 0; background: #f8f9fa; }
-        .version { color: #666; font-size: 0.9em; }
-        .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }
+        .enabled { background: #d4edda; color: #155724; padding: 10px; border-radius: 5px; margin: 10px 0; }
       </style>
     </head>
     <body>
       <div class="container">
-        <h1>Webhook Z-API v3.0 - WDespachante</h1>
-        <div class="version">Versão 3.0 - Com análise e resposta automática</div>
-        
+        <h1>Webhook Z-API v3.1 - WDespachante</h1>
         <div class="status">
           <h2>Status: <span style="color: green;">● Operacional</span></h2>
-          <p>Serviço webhook para receber mensagens WhatsApp via Z-API</p>
-          <p><strong>Recursos:</strong> Salvamento automático, análise inteligente, resposta automática ${ZAPI_CONFIG.RESPONSE_ENABLED ? 'HABILITADA' : 'DESABILITADA'}</p>
-        </div>
-        
-        <div class="warning">
-          <strong>⚠️ Resposta automática:</strong> ${ZAPI_CONFIG.RESPONSE_ENABLED ? 'ATIVADA' : 'DESATIVADA'}<br>
-          <small>Para ativar, defina RESPONSE_ENABLED=true nas variáveis de ambiente</small>
-        </div>
-        
-        <div class="endpoints">
-          <h3>Endpoints disponíveis:</h3>
-          <div class="endpoint">
-            <strong>POST /webhook</strong> - Receber mensagens da Z-API<br>
-            <small>Salva automaticamente e analisa a mensagem</small>
+          <div class="enabled">
+            <strong>🚀 RESPOSTA AUTOMÁTICA ATIVADA</strong>
+            <p>Sistema está respondendo automaticamente às mensagens com confiança > 50%</p>
           </div>
-          <div class="endpoint">
-            <strong>GET /health</strong> - Health check (Render monitor)<br>
-            <small>Usado por UptimeRobot para keep-alive</small>
-          </div>
-          <div class="endpoint">
-            <strong>GET /status</strong> - Status do serviço<br>
-            <small>Informações técnicas e estatísticas</small>
-          </div>
-          <div class="endpoint">
-            <strong>GET /messages</strong> - Listar mensagens recentes<br>
-            <small>Adicione ?limit=10 para limitar resultados</small>
-          </div>
-          <div class="endpoint">
-            <strong>POST /analyze</strong> - Analisar mensagem (teste)<br>
-            <small>Envie {"text": "sua mensagem"} para análise</small>
-          </div>
-          <div class="endpoint">
-            <strong>POST /send-test</strong> - Enviar mensagem manual (teste)<br>
-            <small>Envie {"phone": "21979060145", "message": "texto"}</small>
-          </div>
+          <p><strong>Recursos:</strong> Salvamento automático, análise inteligente, resposta automática ATIVADA</p>
         </div>
         
         <p>
           <a href="/health">Ver health check JSON</a> | 
-          <a href="/status">Ver status completo</a> |
-          <a href="/messages">Ver mensagens recentes</a>
+          <a href="/status">Ver status completo</a>
         </p>
       </div>
     </body>
@@ -730,25 +701,22 @@ if (RENDER_KEEP_ALIVE) {
 
 // Iniciar servidor
 const server = app.listen(PORT, () => {
-  log(`Servidor iniciado na porta ${PORT}`);
-  log(`Ambiente: ${process.env.NODE_ENV || 'development'}`);
-  log(`Keep-alive: ${RENDER_KEEP_ALIVE ? 'Ativado' : 'Desativado'}`);
-  log(`Banco de dados: ${DB_PATH}`);
-  log(`Z-API Response: ${ZAPI_CONFIG.RESPONSE_ENABLED ? 'HABILITADO' : 'DESABILITADO'}`);
+  log(`🚀 Servidor iniciado na porta ${PORT}`);
+  log(`✅ Resposta automática: ${ZAPI_CONFIG.RESPONSE_ENABLED ? 'ATIVADA' : 'DESATIVADA'}`);
+  log(`📁 Banco de dados: ${DB_PATH}`);
   
   console.log(`
     ========================================
-    Z-API Webhook v3.0 - WDespachante
+    🚀 Z-API Webhook v3.1 - WDespachante
     ========================================
     Porta: ${PORT}
     Health: http://localhost:${PORT}/health
     Webhook: POST http://localhost:${PORT}/webhook
     Status: http://localhost:${PORT}/status
-    Mensagens: GET http://localhost:${PORT}/messages
     Análise: POST http://localhost:${PORT}/analyze
     Envio: POST http://localhost:${PORT}/send-test
     Banco: ${DB_PATH}
-    Z-API Response: ${ZAPI_CONFIG.RESPONSE_ENABLED ? 'ON' : 'OFF'}
+    🔥 Resposta automática: ATIVADA
     ========================================
   `);
 });
@@ -777,11 +745,6 @@ process.on('SIGINT', () => {
       process.exit(0);
     });
   });
-});
-
-// Fechar banco ao sair
-process.on('exit', () => {
-  db.close();
 });
 
 module.exports = app;
