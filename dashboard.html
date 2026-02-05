@@ -11,6 +11,10 @@
     .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 40px -10px rgba(0,0,0,0.15); }
     .fade-in { animation: fadeIn 0.5s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .message-bubble { position: relative; }
+    .message-bubble::after { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; border-radius: 4px; }
+    .message-ia::after { background: linear-gradient(to bottom, #8b5cf6, #a78bfa); }
+    .message-user::after { background: linear-gradient(to bottom, #3b82f6, #60a5fa); }
   </style>
 </head>
 <body class="bg-slate-100 min-h-screen">
@@ -38,7 +42,7 @@
 
   <main class="max-w-7xl mx-auto p-8">
     <!-- Stats Grid -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8" id="stats">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
       <div class="bg-white rounded-2xl p-6 shadow-sm card-hover transition-all cursor-pointer">
         <div class="flex items-center justify-between">
           <div>
@@ -80,7 +84,7 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
       <!-- Preços -->
       <div class="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm">
         <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
@@ -96,9 +100,7 @@
                 <th class="pb-4 font-medium text-right">Total</th>
               </tr>
             </thead>
-            <tbody id="prices-table" class="text-slate-700">
-              <!-- Preços serão inseridos aqui -->
-            </tbody>
+            <tbody id="prices-table" class="text-slate-700"></tbody>
           </table>
         </div>
       </div>
@@ -115,8 +117,8 @@
           <button onclick="testBudget()" class="w-full bg-green-50 hover:bg-green-100 text-green-700 py-3 px-4 rounded-xl font-medium flex items-center gap-3 transition-colors">
             <span>💰</span> Gerar Orçamento
           </button>
-          <button onclick="location.reload()" class="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 py-3 px-4 rounded-xl font-medium flex items-center gap-3 transition-colors">
-            <span>🔄</span> Atualizar
+          <button onclick="loadAll()" class="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 py-3 px-4 rounded-xl font-medium flex items-center gap-3 transition-colors">
+            <span>🔄</span> Atualizar Tudo
           </button>
         </div>
         
@@ -124,13 +126,51 @@
           <h3 class="font-semibold text-amber-800 mb-2 flex items-center gap-2">
             <span>💡</span> Dica
           </h3>
-          <p class="text-amber-700 text-sm">Envie um documento pelo WhatsApp para ver aqui!</p>
+          <p class="text-amber-700 text-sm">Os documentos enviados pelo WhatsApp aparecerão automaticamente aqui!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mensagens e Atendimento IA -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+      <!-- Mensagens -->
+      <div class="bg-white rounded-2xl p-6 shadow-sm">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <span>💬</span> Mensagens Recentes
+          </h2>
+          <span class="text-slate-400 text-sm" id="msgs-count">0 mensagens</span>
+        </div>
+        <div id="messages-list" class="space-y-4 max-h-96 overflow-y-auto">
+          <!-- Mensagens serão inseridas aqui -->
+        </div>
+        <div id="no-messages" class="text-center py-12 text-slate-400">
+          <div class="text-6xl mb-4">💬</div>
+          <p class="text-lg">Nenhuma mensagem ainda</p>
+        </div>
+      </div>
+
+      <!-- Respostas IA -->
+      <div class="bg-white rounded-2xl p-6 shadow-sm">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <span>🤖</span> Respostas da IA
+          </h2>
+          <span class="text-purple-500 text-sm" id="ai-count">0 respostas</span>
+        </div>
+        <div id="ai-responses" class="space-y-4 max-h-96 overflow-y-auto">
+          <!-- Respostas da IA serão inseridas aqui -->
+        </div>
+        <div id="no-ai" class="text-center py-12 text-slate-400">
+          <div class="text-6xl mb-4">🤖</div>
+          <p class="text-lg">Nenhuma resposta da IA ainda</p>
+          <p class="text-sm mt-1">As respostas do DeepSeek aparecerão aqui</p>
         </div>
       </div>
     </div>
 
     <!-- Documentos -->
-    <div class="mt-8 bg-white rounded-2xl p-6 shadow-sm">
+    <div class="bg-white rounded-2xl p-6 shadow-sm">
       <div class="flex justify-between items-center mb-6">
         <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
           <span>📁</span> Documentos no Google Drive
@@ -143,7 +183,6 @@
       <div id="no-docs" class="text-center py-12 text-slate-400">
         <div class="text-6xl mb-4">📭</div>
         <p class="text-lg">Nenhum documento ainda</p>
-        <p class="text-sm mt-1">Os documentos enviados pelo WhatsApp aparecerão aqui</p>
       </div>
     </div>
   </main>
@@ -172,6 +211,69 @@
       `).join('');
     }
 
+    function renderMessages(msgs) {
+      const container = document.getElementById('messages-list');
+      const noMsgs = document.getElementById('no-messages');
+      document.getElementById('msgs-count').textContent = `${msgs.length} mensagem${msgs.length !== 1 ? 'ns' : ''}`;
+      
+      if (msgs.length === 0) {
+        container.innerHTML = '';
+        noMsgs.style.display = 'block';
+        return;
+      }
+      
+      noMsgs.style.display = 'none';
+      container.innerHTML = msgs.map(m => {
+        const date = new Date(m.created_at).toLocaleString('pt-BR');
+        const response = m.deepseek_response ? '✅' : '⏳';
+        
+        return `
+          <div class="message-bubble message-user bg-slate-50 p-4 rounded-xl">
+            <div class="flex justify-between items-start mb-2">
+              <span class="font-semibold text-slate-700">${m.phone}</span>
+              <span class="text-xs text-slate-400">${date}</span>
+            </div>
+            <p class="text-slate-600 text-sm">${m.text || '—'}</p>
+            <div class="flex justify-between items-center mt-2">
+              <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">${m.category || 'sem categoria'}</span>
+              <span class="text-xs ${m.deepseek_response ? 'text-green-600' : 'text-amber-600'}">${response} IA</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderAIResponses(msgs) {
+      const container = document.getElementById('ai-responses');
+      const noAI = document.getElementById('no-ai');
+      const withAI = msgs.filter(m => m.deepseek_response);
+      document.getElementById('ai-count').textContent = `${withAI.length} resposta${withAI.length !== 1 ? 's' : ''}`;
+      
+      if (withAI.length === 0) {
+        container.innerHTML = '';
+        noAI.style.display = 'block';
+        return;
+      }
+      
+      noAI.style.display = 'none';
+      container.innerHTML = withAI.slice(0, 10).map(m => {
+        const date = new Date(m.created_at).toLocaleString('pt-BR');
+        
+        return `
+          <div class="message-bubble message-ia bg-purple-50 p-4 rounded-xl">
+            <div class="flex justify-between items-start mb-2">
+              <span class="font-semibold text-purple-700">${m.phone}</span>
+              <span class="text-xs text-purple-400">${date}</span>
+            </div>
+            <p class="text-slate-600 text-sm mb-2">"${m.text || '—'}"</p>
+            <div class="bg-white p-3 rounded-lg border border-purple-100">
+              <p class="text-sm text-slate-700">${m.deepseek_response || '—'}</p>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
     function renderDocuments(docs) {
       const container = document.getElementById('documents-list');
       const noDocs = document.getElementById('no-docs');
@@ -184,7 +286,7 @@
       }
       
       noDocs.style.display = 'none';
-      container.innerHTML = docs.map(doc => {
+      container.innerHTML = docs.slice(0, 10).map(doc => {
         const icone = doc.tipo === 'image' ? '🖼️' : doc.tipo === 'pdf' ? '📄' : '📎';
         const size = doc.file_size ? (doc.file_size / 1024).toFixed(1) + ' KB' : '—';
         const date = new Date(doc.created_at).toLocaleString('pt-BR');
@@ -205,22 +307,30 @@
       }).join('');
     }
 
-    async function loadStats() {
+    async function loadAll() {
       try {
-        const [statsRes, docsRes] = await Promise.all([
+        const [statsRes, msgsRes, docsRes] = await Promise.all([
           fetch('/stats'),
+          fetch('/api/mensagens'),
           fetch('/api/documentos')
         ]);
         
         const stats = await statsRes.json();
+        const msgs = await msgsRes.json();
         const docs = await docsRes.json();
         
+        // Stats
         document.getElementById('stat-messages').textContent = stats.messages || 0;
         document.getElementById('stat-docs').textContent = stats.docs || 0;
         document.getElementById('stat-budgets').textContent = stats.budgets || 0;
         document.getElementById('stat-revenue').textContent = 'R$ ' + (stats.faturamento || 0).toLocaleString('pt-BR');
         
-        renderDocuments(docs.slice(0, 10));
+        // Messages & AI
+        renderMessages(msgs.slice(0, 20));
+        renderAIResponses(msgs);
+        
+        // Documents
+        renderDocuments(docs);
       } catch (e) {
         console.error('Erro ao carregar dados:', e);
       }
@@ -232,8 +342,8 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: 'Teste de mensagem' })
       });
-      alert('Mensagem de teste enviada!');
-      setTimeout(loadStats, 1000);
+      alert('Mensagem de teste enviada! Aguardando resposta da IA...');
+      setTimeout(loadAll, 2000);
     }
 
     async function testBudget() {
@@ -244,13 +354,13 @@
       });
       const data = await res.json();
       alert(`Orçamento gerado: R$ ${data.total.toFixed(2)}`);
-      setTimeout(loadStats, 1000);
+      setTimeout(loadAll, 1000);
     }
 
     // Inicializar
     renderPrices();
-    loadStats();
-    setInterval(loadStats, 30000);
+    loadAll();
+    setInterval(loadAll, 30000);
   </script>
 </body>
 </html>
