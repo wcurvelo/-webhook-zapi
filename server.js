@@ -195,8 +195,8 @@ app.post('/webhook', async (req, res) => {
 
 // ==================== PROCESSAMENTO ====================
 async function processMessage(payload) {
-  const phone = payload.phone || payload.sender?.phone || 'unknown';
-  const messageType = payload.type || payload.message?.type || 'text';
+  const phone = payload.phone || payload.sender?.phone || "unknown";
+  const messageType = payload.type || payload.message?.type || "text";
   console.log('[' + phone + '] Tipo: ' + messageType);
 
   // Documentos (imagem, pdf, etc.)
