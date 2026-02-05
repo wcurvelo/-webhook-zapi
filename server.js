@@ -16,7 +16,6 @@ const DB_PATH = process.env.DB_PATH || '/tmp/clientes.db';
 
 // Inicializar Google Drive
 const driveManager = new GoogleDriveManager();
-driveManager.createFolders();
 
 // ==================== DEEPSEEK V3.2 VIA OPENROUTER ====================
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
