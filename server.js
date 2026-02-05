@@ -179,19 +179,23 @@ app.post('/test', async (req, res) => {
 
 // ==================== PROCESSAMENTO ====================
 async function processMessage(payload) {
-  const phone = payload.phone || 'unknown';
+  const phone = payload.phone || payload.sender?.phone || 'unknown';
   const messageType = payload.type || payload.message?.type || 'text';
   const messageId = payload.messageId || crypto.randomUUID();
   
-  console.log('[' + phone + '] Tipo: ' + messageType);
+  console.log('[' + phone + '] Tipo: ' + messageType + ' | Raw:', JSON.stringify(payload).substring(0, 200));
   
   if (['image', 'document', 'audio', 'video'].includes(messageType)) {
     await processDocument(payload, phone, messageType, messageId);
     return;
   }
   
-  const text = payload.text?.message || payload.message?.text || '';
-  if (payload.isGroup) return;
+  // Z-API pode ter: payload.text.message.message ou payload.message.text
+  const text = payload.text?.message?.message || payload.text?.message || payload.text || payload.message?.text || '';
+  if (payload.isGroup || payload.is_group) {
+    console.log('Mensagem de grupo, ignorando');
+    return;
+  }
   
   const cat = classifyMessage(text);
   
@@ -203,13 +207,16 @@ async function processMessage(payload) {
 }
 
 async function processDocument(payload, phone, docType, messageId) {
-  let fileUrl = null, fileName = 'arquivo', mimeType = 'application/octet-stream';
-  if (payload.message?.mediaUrl) fileUrl = payload.message.mediaUrl;
-  if (payload.message?.fileName) fileName = payload.message.fileName;
-  if (payload.message?.mimeType) mimeType = payload.message.mimeType;
+  // Z-API pode ter diferentes estruturas
+  const msg = payload.message || payload;
+  let fileUrl = msg.mediaUrl || msg.content?.mediaUrl || null;
+  let fileName = msg.fileName || msg.mediaName || 'arquivo';
+  let mimeType = msg.mimeType || msg.content?.mimeType || 'application/octet-stream';
+  
+  console.log('📎 Documento - phone:', phone, 'type:', docType, 'url:', fileUrl ? 'SIM' : 'NÃO');
+  console.log('📎 Payload:', JSON.stringify(payload).substring(0, 300));
   
   const docCategory = detectDocumentType(fileName, mimeType);
-  console.log('📎 Documento: ' + fileName + ' → ' + docCategory);
   
   let content = null, filePath = null, fileSize = 0, fileHash = null, driveUrl = null;
   
