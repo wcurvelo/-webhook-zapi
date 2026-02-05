@@ -58,3 +58,16 @@ railway.json
 *.key
 *.pem
 *.crt
+# Google Drive
+drive-token.json
+drive-token.txt
+
+# Environment
+.env.local
+
+# Uploads
+uploads/
+ENDOFFILE
+echo "✅ .gitignore atualizado"
+drive-token.json
+uploads/

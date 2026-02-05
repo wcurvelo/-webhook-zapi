@@ -1,0 +1,5 @@
+{
+  "enabled": true,
+  "auth_type": "oauth",
+  "documentation": "Configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET as environment variables"
+}
