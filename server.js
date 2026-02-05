@@ -68,24 +68,7 @@ app.use('/uploads', express.static('./uploads'));
 
 // ==================== DASHBOARD ====================
 app.get('/dashboard', (req, res) => {
-  let precosHtml = '';
-  const servicos = ['transferencia', 'licenciamento_simples', 'baixa_gravame', 'comunicacao_venda'];
-  for (const s of servicos) {
-    const v = WDESPACHANTE.honorarios[s];
-    precosHtml += '<tr><td style="padding:8px;border:1px solid #ddd">' + s.replace(/_/g, ' ') + '</td><td style="padding:8px;border:1px solid #ddd;text-align:right">R$ ' + v.toFixed(2) + '</td><td style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold">R$ ' + (v + WDESPACHANTE.taxas_detran['014-0']).toFixed(2) + '</td></tr>';
-  }
-  
-  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>WDespachante v2.1 + Google Drive</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-gray-50">' +
-    '<div class="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-6">' +
-    '<h1 class="text-3xl font-bold">WDespachante v2.1 + Google Drive</h1>' +
-    '<p>Av. Treze de Maio, 23 - Centro, RJ - 18 anos de experiência</p>' +
-    '<div class="mt-2 text-sm"><span class="bg-green-500 px-2 py-1 rounded">Drive Ativo</span> <span class="bg-purple-500 px-2 py-1 rounded">DeepSeek</span></div></div>' +
-    '<div class="p-6 grid grid-cols-2 gap-6">' +
-    '<div><h2 class="text-xl font-bold mb-4">Preços</h2><table style="width:100%;border-collapse:collapse;background:white"><thead style="background:#f3f4f6"><tr><th style="padding:12px;text-align:left">Serviço</th><th style="padding:12px;text-align:right">Honorário</th><th style="padding:12px;text-align:right">Total</th></tr></thead><tbody>' + precosHtml + '</tbody></table></div>' +
-    '<div><h2 class="text-xl font-bold mb-4">Status</h2><div id="stats" class="text-gray-500">Carregando...</div></div></div>' +
-    '<div class="p-6"><h2 class="text-xl font-bold mb-4">📁 Documentos no Google Drive</h2><div id="docs" class="text-gray-500">Carregando...</div></div>' +
-    '<script>async function load(){const r=await fetch("/stats");const d=await r.json();document.getElementById("stats").innerHTML="<div style=\'display:grid;grid-template-columns:repeat(4,1fr);gap:16px\'><div style=\'background:green;padding:16px;border-radius:8px;color:white\'><div style=\'font-size:24px;font-weight:bold\'>"+d.messages+"</div><div> mensagens</div></div><div style=\'background:blue;padding:16px;border-radius:8px;color:white\'><div style=\'font-size:24px;font-weight:bold\'>"+d.docs+"</div><div> documentos</div></div><div style=\'background:purple;padding:16px;border-radius:8px;color:white\'><div style=\'font-size:24px;font-weight:bold\'>"+d.budgets+"</div><div> orçamentos</div></div><div style=\'background:yellow;padding:16px;border-radius:8px;color:black\'><div style=\'font-size:24px;font-weight:bold\'>R$ "+d.faturamento.toFixed(0)+"</div><div> faturamento</div></div></div>";const dr=await fetch("/api/documentos");const docs=await dr.json();let h="";for(const doc of docs.slice(0,10)){const icone=doc.tipo==="image"?"🖼️":doc.tipo==="pdf"?"📄":"📎";h+="<div class=\'p-3 bg-white rounded shadow mb-2\'>"+icone+" <strong>"+doc.file_name+"</strong> <span class=\'text-gray-500\'>("+(doc.file_size/1024).toFixed(1)+"KB)</span> <span class=\'text-blue-600\'>"+doc.phone+"</span>"+(doc.drive_url?" <a href=\'"+doc.drive_url+"\' target=\'_blank\' class=\'text-green-600\'>📂 Drive</a>":"")+" <span class=\'text-gray-400\'>"+new Date(doc.created_at).toLocaleString()+"</span></div>"}document.getElementById("docs").innerHTML=h||"<div class=\'text-gray-500\'>Nenhum documento</div>";}load();setInterval(load,30000);</script></body></html>';
-  res.send(html);
+  res.sendFile(path.join(__dirname, 'dashboard.html'));
 });
 
 // ==================== APIs ====================

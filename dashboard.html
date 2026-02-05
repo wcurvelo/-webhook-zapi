@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WDespachante - Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 40px -10px rgba(0,0,0,0.15); }
+    .fade-in { animation: fadeIn 0.5s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-slate-800 to-slate-900 text-white py-6 px-8 shadow-lg">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <div>
+        <h1 class="text-3xl font-bold flex items-center gap-3">
+          <span class="text-4xl">🚗</span>
+          WDespachante
+        </h1>
+        <p class="text-slate-400 mt-1">Av. Treze de Maio, 23 - Centro, RJ • 18 anos de experiência</p>
+      </div>
+      <div class="flex gap-3">
+        <span class="bg-green-500/20 text-green-400 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2">
+          <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+          Google Drive Ativo
+        </span>
+        <span class="bg-purple-500/20 text-purple-400 px-4 py-2 rounded-full text-sm font-medium">
+          DeepSeek V3.2
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto p-8">
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8" id="stats">
+      <div class="bg-white rounded-2xl p-6 shadow-sm card-hover transition-all cursor-pointer">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-slate-500 text-sm font-medium">Mensagens</p>
+            <p class="text-3xl font-bold text-slate-800 mt-1" id="stat-messages">0</p>
+          </div>
+          <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-2xl">💬</div>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-2xl p-6 shadow-sm card-hover transition-all cursor-pointer">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-slate-500 text-sm font-medium">Documentos</p>
+            <p class="text-3xl font-bold text-slate-800 mt-1" id="stat-docs">0</p>
+          </div>
+          <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-2xl">📁</div>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-2xl p-6 shadow-sm card-hover transition-all cursor-pointer">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-slate-500 text-sm font-medium">Orçamentos</p>
+            <p class="text-3xl font-bold text-slate-800 mt-1" id="stat-budgets">0</p>
+          </div>
+          <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-2xl">💰</div>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-2xl p-6 shadow-sm card-hover transition-all cursor-pointer">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-slate-500 text-sm font-medium">Faturamento</p>
+            <p class="text-3xl font-bold text-emerald-600 mt-1" id="stat-revenue">R$ 0</p>
+          </div>
+          <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-2xl">📈</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <!-- Preços -->
+      <div class="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+          <span>💵</span> Tabela de Preços
+        </h2>
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="text-left text-slate-500 text-sm border-b border-slate-100">
+                <th class="pb-4 font-medium">Serviço</th>
+                <th class="pb-4 font-medium text-right">Honorário</th>
+                <th class="pb-4 font-medium text-right">Taxa DETRAN</th>
+                <th class="pb-4 font-medium text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody id="prices-table" class="text-slate-700">
+              <!-- Preços serão inseridos aqui -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Ações Rápidas -->
+      <div class="bg-white rounded-2xl p-6 shadow-sm">
+        <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+          <span>⚡</span> Ações Rápidas
+        </h2>
+        <div class="space-y-3">
+          <button onclick="testMessage()" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 py-3 px-4 rounded-xl font-medium flex items-center gap-3 transition-colors">
+            <span>💬</span> Testar Mensagem
+          </button>
+          <button onclick="testBudget()" class="w-full bg-green-50 hover:bg-green-100 text-green-700 py-3 px-4 rounded-xl font-medium flex items-center gap-3 transition-colors">
+            <span>💰</span> Gerar Orçamento
+          </button>
+          <button onclick="location.reload()" class="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 py-3 px-4 rounded-xl font-medium flex items-center gap-3 transition-colors">
+            <span>🔄</span> Atualizar
+          </button>
+        </div>
+        
+        <div class="mt-8 p-4 bg-amber-50 rounded-xl border border-amber-200">
+          <h3 class="font-semibold text-amber-800 mb-2 flex items-center gap-2">
+            <span>💡</span> Dica
+          </h3>
+          <p class="text-amber-700 text-sm">Envie um documento pelo WhatsApp para ver aqui!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Documentos -->
+    <div class="mt-8 bg-white rounded-2xl p-6 shadow-sm">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <span>📁</span> Documentos no Google Drive
+        </h2>
+        <span class="text-slate-400 text-sm" id="docs-count">0 documentos</span>
+      </div>
+      <div id="documents-list" class="grid gap-4">
+        <!-- Documentos serão inseridos aqui -->
+      </div>
+      <div id="no-docs" class="text-center py-12 text-slate-400">
+        <div class="text-6xl mb-4">📭</div>
+        <p class="text-lg">Nenhum documento ainda</p>
+        <p class="text-sm mt-1">Os documentos enviados pelo WhatsApp aparecerão aqui</p>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const TAXA_DETRAN = 209.78;
+    const SERVICOS = [
+      { nome: 'Transferência', preco: 450 },
+      { nome: 'Licenciamento Simples', preco: 150 },
+      { nome: 'Licenciamento c/ Débitos', preco: 250 },
+      { nome: 'Baixa de Gravame', preco: 450 },
+      { nome: 'Comunicação de Venda', preco: 350 },
+      { nome: '2ª Via CRV', preco: 450 },
+      { nome: 'ATPV Digital', preco: 250 }
+    ];
+
+    function renderPrices() {
+      const tbody = document.getElementById('prices-table');
+      tbody.innerHTML = SERVICOS.map(s => `
+        <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+          <td class="py-4 font-medium">${s.nome}</td>
+          <td class="py-4 text-right">R$ ${s.preco.toFixed(2)}</td>
+          <td class="py-4 text-right">R$ ${TAXA_DETRAN.toFixed(2)}</td>
+          <td class="py-4 text-right font-bold text-emerald-600">R$ ${(s.preco + TAXA_DETRAN).toFixed(2)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderDocuments(docs) {
+      const container = document.getElementById('documents-list');
+      const noDocs = document.getElementById('no-docs');
+      document.getElementById('docs-count').textContent = `${docs.length} documento${docs.length !== 1 ? 's' : ''}`;
+      
+      if (docs.length === 0) {
+        container.innerHTML = '';
+        noDocs.style.display = 'block';
+        return;
+      }
+      
+      noDocs.style.display = 'none';
+      container.innerHTML = docs.map(doc => {
+        const icone = doc.tipo === 'image' ? '🖼️' : doc.tipo === 'pdf' ? '📄' : '📎';
+        const size = doc.file_size ? (doc.file_size / 1024).toFixed(1) + ' KB' : '—';
+        const date = new Date(doc.created_at).toLocaleString('pt-BR');
+        const driveLink = doc.drive_url ? `<a href="${doc.drive_url}" target="_blank" class="text-green-600 hover:text-green-700 font-medium flex items-center gap-1">📂 Ver no Drive</a>` : '<span class="text-slate-400">Salvo localmente</span>';
+        
+        return `
+          <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
+            <div class="flex items-center gap-4">
+              <span class="text-3xl">${icone}</span>
+              <div>
+                <p class="font-semibold text-slate-800">${doc.file_name || 'Arquivo sem nome'}</p>
+                <p class="text-sm text-slate-500">${doc.phone} • ${size} • ${date}</p>
+              </div>
+            </div>
+            ${driveLink}
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function loadStats() {
+      try {
+        const [statsRes, docsRes] = await Promise.all([
+          fetch('/stats'),
+          fetch('/api/documentos')
+        ]);
+        
+        const stats = await statsRes.json();
+        const docs = await docsRes.json();
+        
+        document.getElementById('stat-messages').textContent = stats.messages || 0;
+        document.getElementById('stat-docs').textContent = stats.docs || 0;
+        document.getElementById('stat-budgets').textContent = stats.budgets || 0;
+        document.getElementById('stat-revenue').textContent = 'R$ ' + (stats.faturamento || 0).toLocaleString('pt-BR');
+        
+        renderDocuments(docs.slice(0, 10));
+      } catch (e) {
+        console.error('Erro ao carregar dados:', e);
+      }
+    }
+
+    async function testMessage() {
+      await fetch('/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: 'Teste de mensagem' })
+      });
+      alert('Mensagem de teste enviada!');
+      setTimeout(loadStats, 1000);
+    }
+
+    async function testBudget() {
+      const res = await fetch('/api/orcamento', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: '5511999999999', cliente: 'Teste', servico: 'transferencia' })
+      });
+      const data = await res.json();
+      alert(`Orçamento gerado: R$ ${data.total.toFixed(2)}`);
+      setTimeout(loadStats, 1000);
+    }
+
+    // Inicializar
+    renderPrices();
+    loadStats();
+    setInterval(loadStats, 30000);
+  </script>
+</body>
+</html>
