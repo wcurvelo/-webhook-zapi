@@ -195,6 +195,10 @@ app.post('/webhook', async (req, res) => {
 
 // ==================== PROCESSAMENTO ====================
 async function processMessage(payload) {
+
+// DEBUG - Ver payload completo
+console.log('📥 PAYLOAD COMPLETO:', JSON.stringify(payload).substring(0, 500));
+
   const phone = payload.phone || payload.sender?.phone || "unknown";
   const messageType = payload.type || payload.message?.type || "text";
   console.log('[' + phone + '] Tipo: ' + messageType);
