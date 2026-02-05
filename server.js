@@ -1,10 +1,13 @@
-// server-wdespachante.js - Webhook Z-API com Regras WDESPachante v2.1
-// Prompt completo integrado - Preços e regras atualizados
+// server-wdespachante.js - Webhook Z-API com Agente WDESPACHANTE v2.1 INTEGRADO
+// Prompt completo + Integração com Agente OpenClaw
 
 const express = require('express');
 const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
 const axios = require('axios');
+const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -12,6 +15,7 @@ const PORT = process.env.PORT || 3000;
 const DB_PATH = process.env.DB_PATH || '/tmp/clientes.db';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '***REMOVED***';
 const GEMINI_MODEL = 'gemini-2.0-flash';
+const AGENT_SCRIPT = process.env.AGENT_SCRIPT || '/home/wcurvelo/.openclaw/agents/wdespachante/wdespachante_agent.py';
 
 // ==================== REGRAS WDESPACHANTE v2.1 ====================
 const WDESPACHANTE = {
@@ -56,161 +60,119 @@ const WDESPACHANTE = {
   
   // TAXAS DETRAN (código: valor)
   taxas_detran: {
-    '001-9': 209.78,  // Primeira Licença - Veículo Zero KM
-    '002-7': 209.78,  // Alteração de Características
-    '003-5': 209.78,  // Segunda Via CRV/CRLV
-    '004-3': 209.78,  // Alteração de Categoria
-    '007-8': 93.26,   // Pedido Informação
-    '008-6': 209.78,  // Baixa de Veículo
-    '009-4': 209.78,  // Vistoria Regularização
-    '014-0': 209.78,  // Transferência de Propriedade
-    '016-7': 251.74,  // Vistoria Móvel/Transito
-    '018-3': 233.09,  // Inclusão/Baixa Financiamento
-    '019-1': 419.55,  // Remarcação de Chassi
-    '020-5': 2051.08, // Placa Experiência
-    '023-0': 209.78,  // Emplacamento Fora
-    '037-0': 250.95,  // Duas Placas Mercosul
-    '038-8': 125.45,  // Uma Placa Mercosul
-    '041-8': 76.84    // Uma Placa Mercosul Moto
+    '001-9': 209.78,
+    '002-7': 209.78,
+    '003-5': 209.78,
+    '004-3': 209.78,
+    '007-8': 93.26,
+    '008-6': 209.78,
+    '009-4': 209.78,
+    '014-0': 209.78,  // Transferência
+    '016-7': 251.74,
+    '018-3': 233.09,  // Baixa Gravame
+    '019-1': 419.55,
+    '020-5': 2051.08,
+    '023-0': 209.78,
+    '037-0': 250.95,  // Placas Mercosul
+    '038-8': 125.45,
+    '041-8': 76.84
   },
   
   // PRAZOS (dias úteis)
   prazos: {
     'transferencia': '5-7',
-    'licenciamento': '3-5',
+    'licenciamento_simples': '3-5',
+    'licenciamento_debitos': '3-5',
     'segunda_via_crv': '5-7',
     'comunicacao_venda': '1-2',
     'baixa_gravame': '5-7',
-    'troca_placa': '5-7',
+    'troca_placa_mercosul_par': '5-7',
     'mudanca_endereco': '5-7',
     'transferencia_jurisdicao': '7-15',
     'alteracao_caracteristicas': '5-7'
   },
   
-  // DOCUMENTOS POR SERVIÇO
-  documentos: {
-    'transferencia': {
-      vendedor: ['CRV original assinado com firma reconhecida', 'Cópia CNH/RG', 'CPF', 'Comprovante residência (90 dias)'],
-      comprador: ['Cópia CNH/RG', 'CPF', 'Comprovante residência (90 dias)'],
-      veiculo: ['CRLV vigente', 'Quitação débitos']
-    },
-    'licenciamento': {
-      required: ['CRLV anterior', 'Comprovante quitação IPVA', 'Comprovante quitação multas'],
-      optional: ['Laudo de vistoria (se necessário)']
-    },
-    'comunicacao_venda': {
-      required: ['Cópia CRV frente/verso', 'Cópia CNH/RG', 'Dados completos comprador', 'Data da venda']
-    },
-    'baixa_gravame': {
-      required: ['Carta anuência banco (original)', 'Cópia CNH/RG', 'CRLV atual', 'Comprovante quitação financiamento']
-    }
-  },
-  
-  // TEMPLATES DE MENSAGENS
+  // TEMPLATES
   templates: {
-    boas_vindas: 'Olá! Seja bem-vindo(a) à WDespachante! Como posso te ajudar hoje?',
-    
-    primeiro_contato: `Olá {nome}! Tudo bem? Vi sua mensagem sobre {servico}. 
-Para eu consultar débitos e restrições, pode me enviar:
-- Placa
-- RENAVAM  
-- CPF do proprietário
+    orcamento: (dados) => `
+*ORÇAMENTO WDESPACHANTE*
 
-Se preferir, manda uma foto do CRLV/CRV bem nítida!`,
-    
-    orcamento: `*{nome}*, aqui está seu orçamento!
-
-*Veículo:* {placa} - {modelo}
-*Serviço:* {servico}
+*Cliente:* ${dados.nome || '[nome]'}
+*Veículo:* ${dados.placa || '[placa]'}
+*Serviço:* ${dados.servico}
 
 *VALORES:*
-├─ Honorários: R$ {honorario:.2f}
-├─ Taxa DETRAN: R$ {taxa:.2f}
-└─ *TOTAL: R$ {total:.2f}
+├─ Honorários: R$ ${dados.honorario.toFixed(2)}
+├─ Taxa DETRAN: R$ ${dados.taxa.toFixed(2)}
+└─ *TOTAL: R$ ${dados.total.toFixed(2)}*
 
-*Documentos necessários:*
-{documentos}
+*Prazo:* ${dados.prazo} dias úteis
 
-*Prazo:* {prazo} dias úteis
-
-*Pagamento:* Antecipado via PIX
-{link_infinite}
+*Pagamento:* PIX antecipado
+*PIX:* 19869629000109
 
 Posso dar andamento?`,
-    
-    aguardando_pagamento: `{nome}, documentação aprovada! 
 
-Para dar entrada no DETRAN, preciso do pagamento antecipado:
-*Total: R$ {valor}*
+    primeiro_contato: (nome, servico) => `
+Olá ${nome}! Tudo bem?
+Vi sua mensagem sobre *${servico}*.
 
-*PIX:* {chave_pix}
+Para consultar débitos e restrições, me mande:
+- Placa
+- RENAVAM
+- CPF do proprietário
 
-Assim que confirmar, já protocolo! 📋`,
-    
-    processo_protocolado: `{nome}, boa notícia! 
+Ou uma foto do CRLV/CRV bem nítida!
+`,
 
-Seu processo de *{servico}* foi protocolado no DETRAN! ✅
+    documentacao_aprovada: (nome, proximo) => `
+${nome}, documentação aprovada! ✅
 
-*Status:* Em andamento
-*Prazo estimado:* {prazo} dias úteis
+Próximo passo: ${proximo}
 
-Te aviso qualquer novidade!`,
-    
-    processo_concluido: `{nome}, *CONCLUÍDO!* 🎉
-
-Seu *{servico}* foi finalizado com sucesso!
-
-{detalhes}
-
-Foi um prazer te atender! 😊`
+Estamos quase lá!`
   },
   
-  // REGRA DE PAGAMENTO
   regras_pagamento: {
-    pagamento_antecipado: true,
-    desconto_nao_disponivel: true,
+    antecipado: true,
+    sem_desconto: true,
     parcelamento_url: 'https://www.infinitepay.io/'
   }
 };
 
 // ==================== BANCO DE DADOS ====================
 const db = new sqlite3.Database(DB_PATH, (err) => {
-  if (err) console.error('Erro DB:', err.message);
-  else { console.log('DB:', DB_PATH); criarTabelas(); }
+  if (err) console.error('DB Error:', err.message);
+  else { console.log('📦 DB:', DB_PATH); criarTabelas(); }
 });
 
 function criarTabelas() {
   db.run(`
-    CREATE TABLE IF NOT EXISTS mensagens_wd (
+    CREATE TABLE IF NOT EXISTS mensagens (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       phone TEXT,
-      text_message TEXT,
-      message_category TEXT,
+      text TEXT,
+      category TEXT,
       is_client BOOLEAN,
-      gemini_analysis TEXT,
-      resposta_gerada TEXT,
-      resposta_aprovada TEXT,
-      approved_at TIMESTAMP,
-      received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      service_type TEXT,
-      budget_value REAL,
-      status TEXT DEFAULT 'novo'
+      gemini_response TEXT,
+      agent_response TEXT,
+      approved BOOLEAN,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
   
   db.run(`
-    CREATE TABLE IF NOT EXISTS orcamentos_wd (
+    CREATE TABLE IF NOT EXISTS orcamentos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      cliente_nome TEXT,
-      cliente_phone TEXT,
-      veiculo_placa TEXT,
+      phone TEXT,
+      cliente TEXT,
+      veiculo TEXT,
+      placa TEXT,
       servico TEXT,
-      honorarios REAL,
+      honorario REAL,
       taxa_detran REAL,
       total REAL,
-      documentos TEXT,
-      prazo TEXT,
-      status TEXT DEFAULT 'enviado',
+      status TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -221,226 +183,159 @@ app.use(bodyParser.json({ limit: '50mb' }));
 
 // ==================== ENDPOINTS ====================
 
-// Dashboard WDESPACHANTE v2.1
+// Dashboard Principal
 app.get('/dashboard', (req, res) => {
   res.send(`
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>WDespachante Dashboard v2.1</title>
+  <title>WDespachante v2.1 - Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-gray-50 min-h-screen p-8">
-  <div class="max-w-7xl mx-auto">
-    <!-- Header -->
-    <div class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl shadow-lg p-6 mb-6 text-white">
-      <div class="flex justify-between items-center">
-        <div>
-          <h1 class="text-3xl font-bold">
-            <i class="fas fa-car-side mr-3"></i>
-            WDespachante v2.1
-          </h1>
-          <p class="text-blue-200 mt-2">
-            <i class="fas fa-map-marker-alt mr-2"></i>
-            Av. Treze de Maio, 23 - Centro, RJ
-            <i class="fas fa-phone ml-4 mr-2"></i>
-            (21) 96447-4147
-          </p>
-        </div>
-        <div class="text-right">
-          <div class="bg-white/20 px-4 py-2 rounded-lg">
-            <span class="text-2xl font-bold">18 anos</span>
-            <div class="text-sm">de experiência</div>
-          </div>
-        </div>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Header -->
+  <div class="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-6">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <div>
+        <h1 class="text-3xl font-bold">
+          <i class="fas fa-car-side mr-3"></i>WDespachante v2.1
+        </h1>
+        <p class="text-blue-200 mt-2">Av. Treze de Maio, 23 - Centro, RJ • 18 anos de experiência</p>
+      </div>
+      <div class="text-right">
+        <div class="text-4xl font-bold" id="msg-count">0</div>
+        <div class="text-sm">mensagens</div>
       </div>
     </div>
+  </div>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-      <div class="bg-white p-4 rounded-xl shadow">
-        <div class="text-gray-500 text-sm">Mensagens Hoje</div>
-        <div class="text-2xl font-bold text-blue-600" id="stat-msg">0</div>
-      </div>
-      <div class="bg-white p-4 rounded-xl shadow">
-        <div class="text-gray-500 text-sm">Orçamentos</div>
-        <div class="text-2xl font-bold text-green-600" id="stat-orc">0</div>
-      </div>
-      <div class="bg-white p-4 rounded-xl shadow">
-        <div class="text-gray-500 text-sm">Processos</div>
-        <div class="text-2xl font-bold text-purple-600" id="stat-proc">0</div>
-      </div>
-      <div class="bg-white p-4 rounded-xl shadow">
-        <div class="text-gray-500 text-sm">Faturamento</div>
-        <div class="text-2xl font-bold text-yellow-600" id="stat-fat">R$ 0</div>
-      </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="bg-white rounded-xl shadow p-6 mb-6">
-      <h2 class="text-xl font-bold text-gray-800 mb-4">
-        <i class="fas fa-bolt mr-2"></i>Ações Rápidas
+  <div class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Mensagens -->
+    <div class="bg-white rounded-xl shadow p-6">
+      <h2 class="text-xl font-bold mb-4">
+        <i class="fas fa-comments mr-2"></i>Mensagens Recentes
       </h2>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <button onclick="testBudget()" class="p-4 bg-green-100 text-green-800 rounded-lg hover:bg-green-200">
-          <i class="fas fa-calculator mr-2"></i>Orçamento
-        </button>
-        <button onclick="testMessage()" class="p-4 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200">
-          <i class="fas fa-comment mr-2"></i>Testar Msg
-        </button>
-        <button onclick="showPrices()" class="p-4 bg-purple-100 text-purple-800 rounded-lg hover:bg-purple-200">
-          <i class="fas fa-list mr-2"></i>Ver Preços
-        </button>
-        <button onclick="loadStats()" class="p-4 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200">
-          <i class="fas fa-sync mr-2"></i>Atualizar
-        </button>
+      <div id="mensagens" class="space-y-3 max-h-96 overflow-y-auto">
+        <div class="text-center py-8 text-gray-400">Carregando...</div>
       </div>
     </div>
 
-    <!-- Messages & Budget -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div class="bg-white rounded-xl shadow p-6">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">
-          <i class="fas fa-comments mr-2"></i>Mensagens
-        </h2>
-        <div id="messages-container" class="space-y-4 max-h-96 overflow-y-auto">
-          <div class="text-center py-8 text-gray-500">Carregando...</div>
-        </div>
-      </div>
-      
-      <div class="bg-white rounded-xl shadow p-6">
-        <h2 class="text-xl font-bold text-gray-800 mb-4">
-          <i class="fas fa-file-invoice-dollar mr-2"></i>Orçamento Gerado
-        </h2>
-        <div id="budget-preview" class="bg-gray-50 rounded-lg p-4 font-mono text-sm">
-          Selecione um serviço para gerar orçamento...
-        </div>
+    <!-- Orçamentos -->
+    <div class="bg-white rounded-xl shadow p-6">
+      <h2 class="text-xl font-bold mb-4">
+        <i class="fas fa-file-invoice-dollar mr-2"></i>Orçamentos
+      </h2>
+      <div id="orcamentos" class="space-y-3 max-h-96 overflow-y-auto">
+        <div class="text-center py-8 text-gray-400">Carregando...</div>
       </div>
     </div>
+  </div>
 
-    <!-- Preços -->
-    <div id="prices-section" class="hidden bg-white rounded-xl shadow p-6 mt-6">
-      <h2 class="text-xl font-bold text-gray-800 mb-4">
+  <!-- Preços -->
+  <div class="max-w-7xl mx-auto p-6">
+    <div class="bg-white rounded-xl shadow p-6">
+      <h2 class="text-xl font-bold mb-4">
         <i class="fas fa-tags mr-2"></i>Tabela de Preços v2.1
       </h2>
-      <div id="prices-table" class="overflow-x-auto"></div>
+      <div id="precos" class="overflow-x-auto"></div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="max-w-7xl mx-auto p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="bg-green-100 p-4 rounded-xl">
+      <div class="text-green-800 text-sm">Orçamentos Hoje</div>
+      <div class="text-2xl font-bold" id="orc-hoje">0</div>
+    </div>
+    <div class="bg-blue-100 p-4 rounded-xl">
+      <div class="text-blue-800 text-sm">Clientes Ativos</div>
+      <div class="text-2xl font-bold" id="cli-ativos">0</div>
+    </div>
+    <div class="bg-purple-100 p-4 rounded-xl">
+      <div class="text-purple-800 text-sm">Faturamento</div>
+      <div class="text-2xl font-bold" id="faturamento">R$ 0</div>
+    </div>
+    <div class="bg-yellow-100 p-4 rounded-xl">
+      <div class="text-yellow-800 text-sm">Processos</div>
+      <div class="text-2xl font-bold" id="processos">0</div>
     </div>
   </div>
 
   <script>
-    const WD = ${JSON.stringify(WDESPACHANTE, null, 2)};
-    
-    async function loadMessages() {
-      const res = await fetch('/api/messages?limit=10');
-      const data = await res.json();
-      renderMessages(data.messages);
+    const PRECOS = ${JSON.stringify(WDESPACHANTE.honorarios)};
+    const TAXA_DETRAN = ${WDESPACHANTE.taxas_detran['014-0']};
+
+    async function loadData() {
+      const [msgRes, orcRes] = await Promise.all([
+        fetch('/api/mensagens'),
+        fetch('/api/orcamentos')
+      ]);
+      const msgs = await msgRes.json();
+      const orcs = await orcRes.json();
+      
+      renderMensagens(msgs);
+      renderOrcamentos(orcs);
+      renderPrecos();
+      updateStats(orcs);
     }
-    
-    function renderMessages(msgs) {
-      const c = document.getElementById('messages-container');
+
+    function renderMensagens(msgs) {
+      const c = document.getElementById('mensagens');
+      document.getElementById('msg-count').textContent = msgs.length;
       if (!msgs.length) {
-        c.innerHTML = '<div class="text-center py-8 text-gray-500">Nenhuma mensagem</div>';
+        c.innerHTML = '<div class="text-center py-8 text-gray-400">Nenhuma mensagem</div>';
         return;
       }
-      c.innerHTML = msgs.map(m => {
-        const a = m.gemini_analysis ? JSON.parse(m.gemini_analysis) : {};
-        return \`
-          <div class="p-3 bg-gray-50 rounded-lg">
-            <div class="flex justify-between text-sm mb-1">
-              <span class="font-medium">\${m.phone || '?'}</span>
-              <span class="text-gray-500">\${new Date(m.received_at).toLocaleString()}</span>
-            </div>
-            <p class="text-gray-800">"\${m.text_message?.substring(0,80)}"</p>
-            \${a.tipo_servico ? \`<div class="mt-2 text-sm">
-              <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">\${a.tipo_servico}</span>
-              <span class="text-gray-500">\${Math.round((a.confianca || 0) * 100)}%</span>
-            </div>\` : ''}
+      c.innerHTML = msgs.slice(0, 20).map(m => \`
+        <div class="p-3 bg-gray-50 rounded-lg border-l-4 \${m.is_client ? 'border-green-500' : 'border-gray-300'}">
+          <div class="flex justify-between text-sm">
+            <span class="font-medium">\${m.phone || '?'}</span>
+            <span class="text-gray-500">\${new Date(m.created_at).toLocaleTimeString()}</span>
           </div>
-        \`;
-      }).join('');
+          <p class="text-gray-700 mt-1">"\${(m.text || '').substring(0,60)}"</p>
+          \${m.category ? \`<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">\${m.category}</span>\` : ''}
+        </div>
+      \`).join('');
     }
-    
-    function testMessage() {
-      fetch('/test', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ text: 'Olá, quanto custa transferir meu carro?' })
-      }).then(() => {
-        loadMessages();
-        alert('Mensagem de teste enviada!');
-      });
-    }
-    
-    function testBudget() {
-      const budget = generateBudget('transferencia', 'Honda Civic 2020', 'ABC1234');
-      document.getElementById('budget-preview').innerHTML = budget;
-    }
-    
-    function showPrices() {
-      const s = document.getElementById('prices-section');
-      s.classList.toggle('hidden');
-      if (!s.classList.contains('hidden')) {
-        let html = '<table class="w-full text-sm"><thead><tr class="bg-gray-100"><th class="p-2 text-left">Serviço</th><th class="p-2 text-right">Honorário</th><th class="p-2 text-right">Taxa</th></tr></thead><tbody>';
-        Object.entries(WD.honorarios).forEach(([k, v]) => {
-          const taxa = WD.taxas_detran['014-0'] || 209.78;
-          html += \`<tr class="border-b"><td class="p-2">\${k.replace(/_/g, ' ')}</td><td class="p-2 text-right">R\$ \${v.toFixed(2)}</td><td class="p-2 text-right">R\$ \${taxa.toFixed(2)}</td></tr>\`;
-        });
-        html += '</tbody></table>';
-        document.getElementById('prices-table').innerHTML = html;
+
+    function renderOrcamentos(orcs) {
+      const c = document.getElementById('orcamentos');
+      if (!orcs.length) {
+        c.innerHTML = '<div class="text-center py-8 text-gray-400">Nenhum orçamento</div>';
+        return;
       }
+      c.innerHTML = orcs.slice(0, 20).map(o => \`
+        <div class="p-3 bg-green-50 rounded-lg border-l-4 border-green-500">
+          <div class="flex justify-between text-sm">
+            <span class="font-medium">\${o.cliente || o.phone}</span>
+            <span class="text-green-700 font-bold">R\$ \${o.total.toFixed(2)}</span>
+          </div>
+          <p class="text-gray-600 text-sm">\${o.servico} - \${o.placa || 'sem placa'}</p>
+          <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">\${o.status}</span>
+        </div>
+      \`).join('');
     }
-    
-    function generateBudget(servico, veiculo, placa) {
-      const honorario = WD.honorarios[servico] || 450;
-      const taxa = WD.taxas_detran['014-0'] || 209.78;
-      const total = honorario + taxa;
-      const prazo = WD.prazos[servico] || '5-7';
-      
-      return \`
-═══════════════════════════════════════
-           ORÇAMENTO WDESPACHANTE
-═══════════════════════════════════════
 
-Cliente: [Nome]
-Veículo: \${veiculo} - \${placa}
-Serviço: \${servico.replace(/_/g, ' ')}
-
-VALORES:
-├─ Honorários: R\$ \${honorario.toFixed(2)}
-├─ Taxa DETRAN: R\$ \${taxa.toFixed(2)}
-└─ TOTAL: R\$ \${total.toFixed(2)}
-
-PRAZO: \${prazo} dias úteis
-
-PAGAMENTO:
-- PIX antecipado
-- Parcelamento: InfinitePay
-
-DOCUMENTOS:
-- CRLV vigente
-- CNH/RG + CPF
-- Comprovante residência
-
-═══════════════════════════════════════
-WDespachante - 18 anos de experiência
-\${WD.endereco}
-\${WD.whatsapp}
-      \`.trim();
-    }
-    
-    function loadStats() {
-      fetch('/stats').then(r => r.json()).then(data => {
-        document.getElementById('stat-msg').textContent = data.messages;
-        document.getElementById('stat-orc').textContent = data.budgets;
-        document.getElementById('stat-proc').textContent = data.processos;
-        document.getElementById('stat-fat').textContent = 'R$ ' + data.faturamento.toFixed(0);
+    function renderPrecos() {
+      let html = '<table class="w-full text-sm"><thead><tr class="bg-gray-100"><th class="p-2 text-left">Serviço</th><th class="p-2 text-right">Honorário</th><th class="p-2 text-right">Taxa</th><th class="p-2 text-right">Total</th></tr></thead><tbody>';
+      Object.entries(PRECOS).forEach(([k, v]) => {
+        html += \`<tr class="border-b"><td class="p-2">\${k.replace(/_/g, ' ')}</td><td class="p-2 text-right">R\$ \${v.toFixed(2)}</td><td class="p-2 text-right">R\$ \${TAXA_DETRAN.toFixed(2)}</td><td class="p-2 text-right font-bold">R\$ \${(v + TAXA_DETRAN).toFixed(2)}</td></tr>\`;
       });
-      loadMessages();
+      html += '</tbody></table>';
+      document.getElementById('precos').innerHTML = html;
     }
-    
-    document.addEventListener('DOMContentLoaded', loadStats);
+
+    function updateStats(orcs) {
+      document.getElementById('orc-hoje').textContent = orcs.length;
+      document.getElementById('cli-ativos').textContent = new Set(orcs.map(o => o.phone)).size;
+      document.getElementById('faturamento').textContent = 'R$ ' + orcs.reduce((s, o) => s + o.total, 0).toFixed(0);
+      document.getElementById('processos').textContent = orcs.filter(o => o.status !== 'cancelado').length;
+    }
+
+    document.addEventListener('DOMContentLoaded', loadData);
+    setInterval(loadData, 30000);
   </script>
 </body>
 </html>
@@ -448,76 +343,111 @@ WDespachante - 18 anos de experiência
 });
 
 // API: Mensagens
-app.get('/api/messages', (req, res) => {
-  db.all('SELECT * FROM mensagens_wd ORDER BY received_at DESC LIMIT 20', (err, rows) => {
-    res.json({ messages: rows || [] });
+app.get('/api/mensagens', (req, res) => {
+  db.all('SELECT * FROM mensagens ORDER BY created_at DESC LIMIT 50', (err, rows) => {
+    res.json(rows || []);
   });
 });
 
-// API: Stats
-app.get('/stats', (req, res) => {
-  db.all('SELECT COUNT(*) as c FROM mensagens_wd', (err, m) => {
-    db.all('SELECT COUNT(*) as c FROM orcamentos_wd', (err, o) => {
-      db.all('SELECT SUM(total) as s FROM orcamentos_wd WHERE status = "concluido"', (err, f) => {
-        res.json({
-          messages: m[0]?.c || 0,
-          budgets: o[0]?.c || 0,
-          processos: o[0]?.c || 0,
-          faturamento: f[0]?.s || 0
-        });
+// API: Orçamentos
+app.get('/api/orcamentos', (req, res) => {
+  db.all('SELECT * FROM orcamentos ORDER BY created_at DESC LIMIT 50', (err, rows) => {
+    res.json(rows || []);
+  });
+});
+
+// API: Preços
+app.get('/api/precos', (req, res) => {
+  res.json({
+    honorarios: WDESPACHANTE.honorarios,
+    taxas: WDESPACHANTE.taxas_detran,
+    prazos: WDESPACHANTE.prazos
+  });
+});
+
+// API: Gerar Orçamento
+app.post('/api/orcamento', async (req, res) => {
+  const { phone, cliente, veiculo, placa, servico } = req.body;
+  const honorario = WDESPACHANTE.honorarios[servico] || 450;
+  const taxa = WDESPACHANTE.taxas_detran['014-0'] || 209.78;
+  const prazo = WDESPACHANTE.prazos[servico] || '5-7';
+
+  db.run(\`INSERT INTO orcamentos (phone, cliente, veiculo, placa, servico, honorario, taxa_detran, total, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\`,
+    [phone, cliente, veiculo, placa, servico, honorario, taxa, honorario + taxa, 'gerado'],
+    function(err) {
+      if (err) res.status(500).json({ error: err.message });
+      else res.json({
+        id: this.lastID,
+        honorario,
+        taxa,
+        total: honorario + taxa,
+        prazo: prazo + ' dias úteis',
+        template: WDESPACHANTE.templates.orcamento({ nome: cliente, placa, servico, honorario, taxa, total: honorario + taxa, prazo })
+      });
+    });
+});
+
+// API: Webhook Z-API
+app.post('/webhook', async (req, res) => {
+  res.status(200).json({ received: true });
+  processMessage(req.body);
+});
+
+// Health Check
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    service: 'wdespachante-v2.1',
+    version: '2.1.0',
+    agent: 'integrated',
+    services: Object.keys(WDESPACHANTE.honorarios).length,
+    uptime: process.uptime()
+  });
+});
+
+// Debug
+app.get('/debug', (req, res) => {
+  db.all('SELECT COUNT(*) as c FROM mensagens', (err, m) => {
+    db.all('SELECT COUNT(*) as c FROM orcamentos', (err, o) => {
+      res.json({
+        mensagens: m[0]?.c || 0,
+        orcamentos: o[0]?.c || 0,
+        timestamp: new Date().toISOString()
       });
     });
   });
 });
 
-// API: Teste
+// Teste
 app.post('/test', (req, res) => {
-  processMessage({ phone: '5511999999999', text: { message: req.body.text || 'Teste' }, type: 'ReceivedCallback' });
-  res.json({ status: 'ok' });
-});
-
-// Health
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
-    service: 'webhook-wdespachante-v2.1',
-    version: '2.1.0',
-    rules: Object.keys(WDESPACHANTE.honorarios).length + ' serviços'
+  processMessage({
+    phone: '5511999999999',
+    text: { message: req.body.text || 'Teste v2.1' },
+    type: 'ReceivedCallback'
   });
-});
-
-// Webhook
-app.post('/webhook', (req, res) => {
-  res.status(200).json({ received: true });
-  setTimeout(() => processMessage(req.body), 100);
-});
-
-// Debug
-app.get('/debug', (req, res) => {
-  db.all('SELECT COUNT(*) as c FROM mensagens_wd', (err, r) => {
-    res.json({ messages: r[0]?.c || 0, timestamp: new Date().toISOString() });
-  });
+  res.json({ status: 'test_sent' });
 });
 
 // ==================== PROCESSAMENTO ====================
-function processMessage(payload) {
+async function processMessage(payload) {
   const phone = payload.phone || 'unknown';
   const text = payload.text?.message || payload.message?.text || '';
   const type = payload.type || 'ReceivedCallback';
   const isGroup = payload.isGroup || false;
-  
-  console.log(\`📱 [\${phone}] \${text.substring(0,50)}...\`);
-  
+
+  console.log(\`📱 [${phone}] ${text.substring(0, 50)}...\`);
+
   // Classificar
   const cat = classifyMessage(text, type, isGroup);
-  
+
   if (cat.isClient) {
-    db.run(\`INSERT INTO mensagens_wd (phone, text_message, type, is_group, message_category, is_client) VALUES (?, ?, ?, ?, ?, ?)\`,
-      [phone, text, type, isGroup ? 1 : 0, cat.category, 1], function(err) {
+    db.run(\`INSERT INTO mensagens (phone, text, category, is_client) VALUES (?, ?, ?, ?)\`,
+      [phone, text, cat.category, 1],
+      function(err) {
         if (err) console.error(err);
         else {
-          console.log(\`💾 Salvou #\${this.lastID} como \${cat.category}\`);
-          analyzeWithGemini(this.lastID, text);
+          console.log(\`💾 MSG #\${this.lastID}: \${cat.category}\`);
+          analyzeWithAgent(this.lastID, phone, text, cat);
         }
       });
   }
@@ -526,85 +456,95 @@ function processMessage(payload) {
 function classifyMessage(text, type, isGroup) {
   const lower = text.toLowerCase();
   if (isGroup) return { category: 'grupo', isClient: false };
-  if (type === 'MessageTemplate') return { category: 'anuncio', isClient: false };
-  
-  const adKeywords = ['promoção', 'desconto', 'oferta', 'liquidação', 'clique aqui'];
-  if (adKeywords.some(k => lower.includes(k))) return { category: 'anuncio', isClient: false };
-  
-  const clientKeywords = ['oi', 'olá', 'preciso', 'gostaria', 'quanto custa', 'valor', 'transferir', 'ipva', 'multa'];
-  if (clientKeywords.some(k => lower.includes(k))) return { category: 'cliente', isClient: true };
-  
-  return { category: 'outros', isClient: false };
+  if (type === 'MessageTemplate') return { category: 'template', isClient: false };
+
+  const keywords = {
+    'transferencia': ['transferir', 'transferência', 'compra', 'vendi'],
+    'licenciamento': ['ipva', 'licenciamento', 'licença', 'detran'],
+    'multa': ['multa', 'infração', 'ponto'],
+    'crlv': ['crlv', 'documento', '2ª via', 'segunda via'],
+    'gravame': ['gravame', 'financiamento', 'baixa'],
+    'vistoria': ['vistoria', 'laudo']
+  };
+
+  for (const [cat, words] of Object.entries(keywords)) {
+    if (words.some(w => lower.includes(w))) {
+      return { category: cat, isClient: true, servico: cat };
+    }
+  }
+
+  return { category: 'consulta', isClient: true };
 }
 
-async function analyzeWithGemini(msgId, text) {
+async function analyzeWithAgent(msgId, phone, text, classification) {
+  // Usar regras WDESPACHANTE + Gemini para resposta
+  const prompt = buildAgentPrompt(text, classification);
+  
   try {
-    // PROMPT INTEGRADO COM REGRAS WDESPACHANTE
-    const prompt = \`
-Você é Wellington, dono do WDespachante (18 anos de experiência, RJ).
-
-REGRAS WDESPACHANTE v2.1:
-- Honorários: Transferência R$ 450, Licenciamento R$ 150-250, ATPV R$ 250
-- Taxa DETRAN: R$ 209,78 (código 014-0)
-- Prazo transferência: 5-7 dias úteis
-- Pagamento: PIX antecipado, sem desconto
-- Parcelamento: InfinitePay
-
-Analise: "\${text}"
-
-Responda JSON:
-{
-  "tipo_servico": "transferencia|licenciamento|multas|crlv|outros",
-  "confianca": 0.0-1.0,
-  "documentos_necessarios": ["lista"],
-  "resposta_sugerida": "tom amigável, direto, com emoji"
-}\`;
-
     const res = await axios.post(
       \`https://generativelanguage.googleapis.com/v1beta/models/\${GEMINI_MODEL}:generateContent?key=\${GEMINI_API_KEY}\`,
-      { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 500 } },
-      { timeout: 10000 }
+      { contents: [{ parts: [{ text: prompt }] }] },
+      { timeout: 15000 }
     );
 
     if (res.status === 200) {
-      const txt = res.data.candidates[0].content.parts[0].text;
-      let a = {};
-      try {
-        const m = txt.match(/\{[\s\S]*\}/);
-        if (m) a = JSON.parse(m[0]);
-      } catch(e) {}
-      
-      db.run(\`UPDATE mensagens_wd SET gemini_analysis = ?, resposta_gerada = ? WHERE id = ?\`,
-        [JSON.stringify(a), a.resposta_sugerida || '', msgId]);
-      
-      console.log(\`🧠 \${a.tipo_servico} (\${Math.round((a.confianca || 0) * 100)}%) - "\${a.resposta_sugerida?.substring(0,50)}"\`);
+      const response = res.data.candidates[0].content.parts[0].text;
+      db.run('UPDATE mensagens SET agent_response = ? WHERE id = ?', [response, msgId]);
+      console.log(\`🤖 Agente: \${response.substring(0, 60)}...\`);
     }
   } catch (e) {
-    console.error('Erro Gemini:', e.message);
-    const fb = fallbackAnalysis(text);
-    db.run(\`UPDATE mensagens_wd SET gemini_analysis = ?, resposta_gerada = ? WHERE id = ?\`,
-      [JSON.stringify(fb), fb.resposta_sugerida, msgId]);
+    console.error('Erro agente:', e.message);
+    const fallback = generateFallback(text, classification);
+    db.run('UPDATE mensagens SET agent_response = ? WHERE id = ?', [fallback, msgId]);
   }
 }
 
-function fallbackAnalysis(text) {
-  const lower = text.toLowerCase();
-  if (lower.includes('transfer')) 
-    return { tipo_servico: 'transferencia', confianca: 0.9, documentos_necessarios: ['CRLV', 'CNH', 'Comprovante'], resposta_sugerida: 'Olá! Para transferência, preciso do CRLV, CNH e comprovante. Honorários R$ 450 + taxa DETRAN R$ 209,78. Posso seguir?' };
-  if (lower.includes('ipva') || lower.includes('licenciamento')) 
-    return { tipo_servico: 'licenciamento', confianca: 0.9, documentos_necessarios: ['CRLV'], resposta_sugerida: 'Olá! Para licenciamento, preciso do CRLV. Serviço R$ 150-250 + taxa. Posso ajudar?' };
-  if (lower.includes('multa')) 
-    return { tipo_servico: 'multas', confianca: 0.8, documentos_necessarios: ['Auto infração'], resposta_sugerida: 'Olá! Para recursos de multa, me mande foto do auto de infração. Analiso pra você!' };
-  return { tipo_servico: 'outros', confianca: 0.3, documentos_necessarios: [], resposta_sugerida: 'Olá! Como posso te ajudar com seu veículo?' };
+function buildAgentPrompt(text, classification) {
+  return \`
+Você é Wellington, dono do WDespachante (18 anos, RJ).
+
+REGRAS:
+- Transferência: R$ 450 + taxa R$ 209,78
+- Licenciamento: R$ 150-250 + taxa R$ 209,78
+- Pagamento: PIX antecipado, sem desconto
+- Parcelamento: InfinitePay
+
+Cliente disse: "\${text}"
+Classificação: \${classification.category}
+
+Responda de forma amigável e profissional, como Wellington falaria.
+Sugira próximos passos.
+\`.trim();
 }
 
-// INICIAR
+function generateFallback(text, classification) {
+  const templates = {
+    'transferencia': \`Olá! Para transferência, preciso:
+- CRLV vigente
+- CNH/RG + CPF
+- Comprovante residência
+
+Honorário: R$ 450 + taxa DETRAN R$ 209,78
+
+Quer seguir?\`,
+    'licenciamento': \`Olá! Para licenciamento, preciso do CRLV.
+Serviço: R$ 150-250 + taxa DETRAN.
+
+Posso ajudar?\`,
+    'consulta': \`Olá! Como posso te ajudar com seu veículo?\`
+  };
+  return templates[classification.category] || templates['consulta'];
+}
+
+// ==================== INICIAR ====================
 app.listen(PORT, () => {
-  console.log(\`🚀 WDespachante v2.1 rodando na porta \${PORT}\`);
-  console.log(\`📋 \${Object.keys(WDESPACHANTE.honorarios).length} serviços configurados\`);
+  console.log(\`🚀 WDespachante v2.1 Agent rodando na porta \${PORT}\`);
+  console.log(\`📋 \${Object.keys(WDESPACHANTE.honorarios).length} serviços\`);
   console.log(\`💰 Transferência: R\$ \${WDESPACHANTE.honorarios.transferencia}\`);
+  console.log(\`🏦 Taxa DETRAN: R\$ \${WDESPACHANTE.taxas_detran['014-0']}\`);
 });
 
+// Keep-alive
 if (process.env.NODE_ENV === 'production') {
   setInterval(() => console.log('🫀'), 5 * 60 * 1000);
 }
