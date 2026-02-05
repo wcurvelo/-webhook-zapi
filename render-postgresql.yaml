@@ -1,0 +1,6 @@
+services:
+  - type: pserv
+    name: webhook-zapi-db
+    plan: free
+    env: postgres
+    version: "15"
