@@ -284,3 +284,18 @@ app.listen(PORT, () => {
 });
 
 module.exports = { app, pool };
+
+// ==================== API MESSAGES ====================
+app.get('/api/messages', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM mensagens ORDER BY id DESC LIMIT 50');
+    res.json(result.rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/messages/:id', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM mensagens WHERE id = $1', [req.params.id]);
+    res.json(result.rows[0] || { error: 'Not found' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
