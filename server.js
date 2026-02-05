@@ -195,17 +195,38 @@ app.post('/webhook', async (req, res) => {
 
 // ==================== PROCESSAMENTO ====================
 async function processMessage(payload) {
-
-// DEBUG - Ver payload completo
-console.log('📥 PAYLOAD COMPLETO:', JSON.stringify(payload).substring(0, 500));
-
   const phone = payload.phone || payload.sender?.phone || "unknown";
   const messageType = payload.type || payload.message?.type || "text";
   console.log('[' + phone + '] Tipo: ' + messageType);
 
-  // Documentos (imagem, pdf, etc.)
+  // Detectar documentos pelo payload real da Z-API
+  let docType = null;
+  let fileUrl = null;
+  
+  if (payload.photo) {
+    docType = 'image';
+    fileUrl = payload.photo;
+  } else if (payload.video) {
+    docType = 'video';
+    fileUrl = payload.video;
+  } else if (payload.document) {
+    docType = 'document';
+    fileUrl = payload.document.url || payload.document;
+  } else if (payload.audio) {
+    docType = 'audio';
+    fileUrl = payload.audio;
+  }
+
+  // Se detectou documento, processar
+  if (docType && fileUrl) {
+    console.log('📎 Detectado:', docType, 'URL:', fileUrl);
+    await processDocument(payload, phone, docType, fileUrl);
+    return;
+  }
+
+  // Fallback: detectar pelo messageType antigo
   if (['image', 'document', 'audio', 'video'].includes(messageType)) {
-    await processDocument(payload, phone, messageType);
+    await processDocument(payload, phone, messageType, null);
     return;
   }
 
@@ -225,13 +246,26 @@ console.log('📥 PAYLOAD COMPLETO:', JSON.stringify(payload).substring(0, 500))
   } catch (e) { console.error(e); }
 }
 
-async function processDocument(payload, phone, docType) {
+async function processDocument(payload, phone, docType, fileUrl) {
   const msg = payload.message || payload;
-  let fileUrl = msg.mediaUrl || msg.content?.mediaUrl || null;
-  let fileName = msg.fileName || msg.mediaName || `arquivo_${Date.now()}`;
-  let mimeType = msg.mimeType || msg.content?.mimeType || 'application/octet-stream';
   
-  console.log('📎 Documento - phone:', phone, 'type:', docType, 'url:', fileUrl ? 'SIM' : 'NÃO');
+  // Usar fileUrl passado como parâmetro OU tentar detectar do payload
+  if (!fileUrl) {
+    fileUrl = msg.mediaUrl || msg.content?.mediaUrl || payload.photo || payload.video || payload.audio || payload.document?.url || payload.document || null;
+  }
+  
+  let fileName = msg.fileName || msg.mediaName || payload.document?.fileName || `arquivo_${Date.now()}`;
+  let mimeType = msg.mimeType || msg.content?.mimeType || payload.document?.mimeType || 'application/octet-stream';
+  
+  // Detectar mimeType pelo tipo de documento
+  if (!mimeType || mimeType === 'application/octet-stream') {
+    if (docType === 'image') mimeType = 'image/jpeg';
+    else if (docType === 'video') mimeType = 'video/mp4';
+    else if (docType === 'audio') mimeType = 'audio/ogg';
+    else if (docType === 'document') mimeType = 'application/pdf';
+  }
+  
+  console.log('📎 Documento - phone:', phone, 'type:', docType, 'url:', fileUrl ? 'SIM' : 'NÃO', 'fileName:', fileName);
 
   let content = null, filePath = null, fileSize = 0, fileHash = null, driveUrl = null, geminiAnalysis = null;
 
@@ -264,7 +298,7 @@ async function processDocument(payload, phone, docType) {
   try {
     await pool.query(
       'INSERT INTO documentos (phone, message_id, tipo, mime_type, file_name, file_path, file_size, file_hash, drive_url, gemini_analysis, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
-      [phone, msg.id || crypto.randomUUID(), docType, mimeType, fileName, filePath, fileSize, fileHash, driveUrl, JSON.stringify(geminiAnalysis), 'analisado']);
+      [phone, msg.id || payload.messageId || crypto.randomUUID(), docType, mimeType, fileName, filePath, fileSize, fileHash, driveUrl, JSON.stringify(geminiAnalysis), 'analisado']);
     console.log('💾 Salvo no PostgreSQL');
   } catch (e) { console.error('Erro ao salvar:', e.message); }
 }
