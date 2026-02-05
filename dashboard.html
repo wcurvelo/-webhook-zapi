@@ -1,366 +1,1047 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WDespachante - Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: 'Inter', sans-serif; }
-    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 40px -10px rgba(0,0,0,0.15); }
-    .fade-in { animation: fadeIn 0.5s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    .message-bubble { position: relative; }
-    .message-bubble::after { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; border-radius: 4px; }
-    .message-ia::after { background: linear-gradient(to bottom, #8b5cf6, #a78bfa); }
-    .message-user::after { background: linear-gradient(to bottom, #3b82f6, #60a5fa); }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WDespachante - Treinamento IA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0f1117;
+            --bg-secondary: #1a1d29;
+            --bg-card: #23263a;
+            --bg-hover: #2d3149;
+            --accent-primary: #667eea;
+            --accent-secondary: #764ba2;
+            --accent-success: #10b981;
+            --accent-warning: #f59e0b;
+            --accent-danger: #ef4444;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --border: #374151;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, #1a1d29 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            padding: 30px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .stat-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            background: var(--bg-secondary);
+            padding: 10px;
+            border-radius: 15px;
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 12px 25px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+        }
+
+        .tab:hover:not(.active) {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-select {
+            padding: 12px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 0.95em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .filter-select:hover {
+            border-color: var(--accent-primary);
+        }
+
+        /* Message Card */
+        .message-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .message-card:hover {
+            border-color: var(--accent-primary);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2);
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .message-info {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .badge-pending {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--accent-warning);
+        }
+
+        .badge-approved {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--accent-success);
+        }
+
+        .badge-corrected {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .message-date {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        .message-section {
+            margin-bottom: 20px;
+        }
+
+        .section-label {
+            font-weight: 600;
+            color: var(--accent-primary);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .message-text {
+            background: var(--bg-secondary);
+            padding: 15px;
+            border-radius: 10px;
+            line-height: 1.6;
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        .suggestion-text {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            line-height: 1.6;
+            border-left: 3px solid var(--accent-secondary);
+        }
+
+        .edit-area {
+            width: 100%;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 15px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 1em;
+            line-height: 1.6;
+            resize: vertical;
+            min-height: 100px;
+            transition: all 0.3s ease;
+        }
+
+        .edit-area:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95em;
+        }
+
+        .btn-approve {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .btn-approve:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-edit {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+
+        .btn-edit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-ignore {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-ignore:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+        }
+
+        .btn-save:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-cancel {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-cancel:hover {
+            background: var(--bg-hover);
+        }
+
+        /* Training Examples Table */
+        .examples-table {
+            width: 100%;
+            background: var(--bg-card);
+            border-radius: 15px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .examples-table thead {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+        }
+
+        .examples-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .examples-table td {
+            padding: 15px;
+            border-top: 1px solid var(--border);
+        }
+
+        .examples-table tr:hover {
+            background: var(--bg-hover);
+        }
+
+        /* Charts */
+        .chart-container {
+            background: var(--bg-card);
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .chart-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .progress-bar {
+            background: var(--bg-secondary);
+            height: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: width 0.5s ease;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .btn-group {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--bg-card);
+            padding: 20px 25px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+            border-left: 4px solid var(--accent-success);
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast-success {
+            border-left-color: var(--accent-success);
+        }
+
+        .toast-error {
+            border-left-color: var(--accent-danger);
+        }
+
+        .service-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            background: rgba(102, 126, 234, 0.2);
+            border-radius: 5px;
+            font-size: 0.85em;
+            color: var(--accent-primary);
+            margin-right: 5px;
+        }
+    </style>
 </head>
-<body class="bg-slate-100 min-h-screen">
-  <!-- Header -->
-  <header class="bg-gradient-to-r from-slate-800 to-slate-900 text-white py-6 px-8 shadow-lg">
-    <div class="max-w-7xl mx-auto flex justify-between items-center">
-      <div>
-        <h1 class="text-3xl font-bold flex items-center gap-3">
-          <span class="text-4xl">🚗</span>
-          WDespachante
-        </h1>
-        <p class="text-slate-400 mt-1">Av. Treze de Maio, 23 - Centro, RJ • 18 anos de experiência</p>
-      </div>
-      <div class="flex gap-3">
-        <span class="bg-green-500/20 text-green-400 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2">
-          <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-          Google Drive Ativo
-        </span>
-        <span class="bg-purple-500/20 text-purple-400 px-4 py-2 rounded-full text-sm font-medium">
-          DeepSeek V3.2
-        </span>
-      </div>
-    </div>
-  </header>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>
+                <span>🚗</span>
+                WDespachante - Treinamento IA
+            </h1>
+            <p>Sistema de aprendizado baseado em feedback humano</p>
+        </div>
 
-  <main class="max-w-7xl mx-auto p-8">
-    <!-- Stats Grid -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-      <div class="bg-white rounded-2xl p-6 shadow-sm card-hover transition-all cursor-pointer">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-slate-500 text-sm font-medium">Mensagens</p>
-            <p class="text-3xl font-bold text-slate-800 mt-1" id="stat-messages">0</p>
-          </div>
-          <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-2xl">💬</div>
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📨</div>
+                <div class="stat-value" id="stat-total">0</div>
+                <div class="stat-label">Mensagens Treinadas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-value" id="stat-approved">0</div>
+                <div class="stat-label">Respostas Aprovadas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✏️</div>
+                <div class="stat-value" id="stat-corrected">0</div>
+                <div class="stat-label">Respostas Corrigidas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📈</div>
+                <div class="stat-value" id="stat-accuracy">0%</div>
+                <div class="stat-label">Taxa de Aprovação</div>
+            </div>
         </div>
-      </div>
-      
-      <div class="bg-white rounded-2xl p-6 shadow-sm card-hover transition-all cursor-pointer">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-slate-500 text-sm font-medium">Documentos</p>
-            <p class="text-3xl font-bold text-slate-800 mt-1" id="stat-docs">0</p>
-          </div>
-          <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-2xl">📁</div>
-        </div>
-      </div>
-      
-      <div class="bg-white rounded-2xl p-6 shadow-sm card-hover transition-all cursor-pointer">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-slate-500 text-sm font-medium">Orçamentos</p>
-            <p class="text-3xl font-bold text-slate-800 mt-1" id="stat-budgets">0</p>
-          </div>
-          <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-2xl">💰</div>
-        </div>
-      </div>
-      
-      <div class="bg-white rounded-2xl p-6 shadow-sm card-hover transition-all cursor-pointer">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-slate-500 text-sm font-medium">Faturamento</p>
-            <p class="text-3xl font-bold text-emerald-600 mt-1" id="stat-revenue">R$ 0</p>
-          </div>
-          <div class="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-2xl">📈</div>
-        </div>
-      </div>
-    </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-      <!-- Preços -->
-      <div class="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm">
-        <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-          <span>💵</span> Tabela de Preços
-        </h2>
-        <div class="overflow-x-auto">
-          <table class="w-full">
-            <thead>
-              <tr class="text-left text-slate-500 text-sm border-b border-slate-100">
-                <th class="pb-4 font-medium">Serviço</th>
-                <th class="pb-4 font-medium text-right">Honorário</th>
-                <th class="pb-4 font-medium text-right">Taxa DETRAN</th>
-                <th class="pb-4 font-medium text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody id="prices-table" class="text-slate-700"></tbody>
-          </table>
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('inbox')">
+                📥 Caixa de Entrada
+            </button>
+            <button class="tab" onclick="switchTab('training')">
+                🎓 Banco de Treinamento
+            </button>
+            <button class="tab" onclick="switchTab('metrics')">
+                📊 Métricas e Análise
+            </button>
         </div>
-      </div>
 
-      <!-- Ações Rápidas -->
-      <div class="bg-white rounded-2xl p-6 shadow-sm">
-        <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-          <span>⚡</span> Ações Rápidas
-        </h2>
-        <div class="space-y-3">
-          <button onclick="testMessage()" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 py-3 px-4 rounded-xl font-medium flex items-center gap-3 transition-colors">
-            <span>💬</span> Testar Mensagem
-          </button>
-          <button onclick="testBudget()" class="w-full bg-green-50 hover:bg-green-100 text-green-700 py-3 px-4 rounded-xl font-medium flex items-center gap-3 transition-colors">
-            <span>💰</span> Gerar Orçamento
-          </button>
-          <button onclick="loadAll()" class="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 py-3 px-4 rounded-xl font-medium flex items-center gap-3 transition-colors">
-            <span>🔄</span> Atualizar Tudo
-          </button>
-        </div>
-        
-        <div class="mt-8 p-4 bg-amber-50 rounded-xl border border-amber-200">
-          <h3 class="font-semibold text-amber-800 mb-2 flex items-center gap-2">
-            <span>💡</span> Dica
-          </h3>
-          <p class="text-amber-700 text-sm">Os documentos enviados pelo WhatsApp aparecerão automaticamente aqui!</p>
-        </div>
-      </div>
-    </div>
+        <!-- Inbox Tab -->
+        <div id="inbox-tab" class="tab-content active">
+            <div class="filters">
+                <select class="filter-select" id="filter-status" onchange="filterMessages()">
+                    <option value="all">Todos os Status</option>
+                    <option value="pending">Pendentes</option>
+                    <option value="approved">Aprovadas</option>
+                    <option value="corrected">Corrigidas</option>
+                </select>
+                <select class="filter-select" id="filter-service" onchange="filterMessages()">
+                    <option value="all">Todos os Serviços</option>
+                    <option value="cnh">CNH</option>
+                    <option value="veiculo">Veículo</option>
+                    <option value="multa">Multa</option>
+                    <option value="licenciamento">Licenciamento</option>
+                    <option value="transferencia">Transferência</option>
+                </select>
+                <select class="filter-select" id="filter-date" onchange="filterMessages()">
+                    <option value="all">Todas as Datas</option>
+                    <option value="today">Hoje</option>
+                    <option value="week">Última Semana</option>
+                    <option value="month">Último Mês</option>
+                </select>
+            </div>
 
-    <!-- Mensagens e Atendimento IA -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-      <!-- Mensagens -->
-      <div class="bg-white rounded-2xl p-6 shadow-sm">
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <span>💬</span> Mensagens Recentes
-          </h2>
-          <span class="text-slate-400 text-sm" id="msgs-count">0 mensagens</span>
+            <div id="messages-container">
+                <!-- Messages will be loaded here -->
+            </div>
         </div>
-        <div id="messages-list" class="space-y-4 max-h-96 overflow-y-auto">
-          <!-- Mensagens serão inseridas aqui -->
-        </div>
-        <div id="no-messages" class="text-center py-12 text-slate-400">
-          <div class="text-6xl mb-4">💬</div>
-          <p class="text-lg">Nenhuma mensagem ainda</p>
-        </div>
-      </div>
 
-      <!-- Respostas IA -->
-      <div class="bg-white rounded-2xl p-6 shadow-sm">
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <span>🤖</span> Respostas da IA
-          </h2>
-          <span class="text-purple-500 text-sm" id="ai-count">0 respostas</span>
+        <!-- Training Tab -->
+        <div id="training-tab" class="tab-content">
+            <div class="chart-container">
+                <h3 class="chart-title">📚 Exemplos de Treinamento por Categoria</h3>
+                <div id="training-stats"></div>
+            </div>
+
+            <table class="examples-table">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Serviço</th>
+                        <th>Mensagem do Cliente</th>
+                        <th>Resposta Aprendida</th>
+                        <th>Tipo</th>
+                    </tr>
+                </thead>
+                <tbody id="training-examples">
+                    <!-- Training examples will be loaded here -->
+                </tbody>
+            </table>
         </div>
-        <div id="ai-responses" class="space-y-4 max-h-96 overflow-y-auto">
-          <!-- Respostas da IA serão inseridas aqui -->
+
+        <!-- Metrics Tab -->
+        <div id="metrics-tab" class="tab-content">
+            <div class="chart-container">
+                <h3 class="chart-title">📊 Evolução do Treinamento</h3>
+                <canvas id="evolution-chart"></canvas>
+            </div>
+
+            <div class="stats-grid">
+                <div class="chart-container">
+                    <h3 class="chart-title">🎯 Qualidade das Sugestões</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="approval-rate" style="width: 0%">0%</div>
+                    </div>
+                    <p style="color: var(--text-secondary); margin-top: 10px;">
+                        Porcentagem de respostas aprovadas sem correção
+                    </p>
+                </div>
+
+                <div class="chart-container">
+                    <h3 class="chart-title">📈 Serviços que Precisam de Mais Exemplos</h3>
+                    <div id="services-need-training"></div>
+                </div>
+            </div>
         </div>
-        <div id="no-ai" class="text-center py-12 text-slate-400">
-          <div class="text-6xl mb-4">🤖</div>
-          <p class="text-lg">Nenhuma resposta da IA ainda</p>
-          <p class="text-sm mt-1">As respostas do DeepSeek aparecerão aqui</p>
-        </div>
-      </div>
     </div>
 
-    <!-- Documentos -->
-    <div class="bg-white rounded-2xl p-6 shadow-sm">
-      <div class="flex justify-between items-center mb-6">
-        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-          <span>📁</span> Documentos no Google Drive
-        </h2>
-        <span class="text-slate-400 text-sm" id="docs-count">0 documentos</span>
-      </div>
-      <div id="documents-list" class="grid gap-4">
-        <!-- Documentos serão inseridos aqui -->
-      </div>
-      <div id="no-docs" class="text-center py-12 text-slate-400">
-        <div class="text-6xl mb-4">📭</div>
-        <p class="text-lg">Nenhum documento ainda</p>
-      </div>
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <span id="toast-icon">✅</span>
+        <span id="toast-message">Ação realizada com sucesso!</span>
     </div>
-  </main>
 
-  <script>
-    const TAXA_DETRAN = 209.78;
-    const SERVICOS = [
-      { nome: 'Transferência', preco: 450 },
-      { nome: 'Licenciamento Simples', preco: 150 },
-      { nome: 'Licenciamento c/ Débitos', preco: 250 },
-      { nome: 'Baixa de Gravame', preco: 450 },
-      { nome: 'Comunicação de Venda', preco: 350 },
-      { nome: '2ª Via CRV', preco: 450 },
-      { nome: 'ATPV Digital', preco: 250 }
-    ];
+    <script>
+        // Simulated Database
+        let messages = [
+            {
+                id: 1,
+                date: new Date(),
+                customer: "João Silva",
+                phone: "11999999999",
+                service: "cnh",
+                originalMessage: "Oi! Preciso renovar minha CNH. Quais documentos preciso?",
+                aiSuggestion: "Olá! Para renovar sua CNH você vai precisar de:\n\n✅ RG e CPF originais\n✅ Comprovante de residência atualizado\n✅ Exame médico e psicotécnico\n\nPosso agendar para você! Qual melhor dia?",
+                status: "pending",
+                correctedResponse: null
+            },
+            {
+                id: 2,
+                date: new Date(Date.now() - 3600000),
+                customer: "Maria Santos",
+                phone: "11988888888",
+                service: "multa",
+                originalMessage: "Recebi uma multa por velocidade. Como faço para recorrer?",
+                aiSuggestion: "Olá Maria! Para recorrer de uma multa de velocidade:\n\n📋 Preciso ver a notificação\n⏰ Temos 15 dias para defesa prévia\n💰 Analisamos se vale a pena recorrer\n\nPode me enviar foto da multa?",
+                status: "pending",
+                correctedResponse: null
+            },
+            {
+                id: 3,
+                date: new Date(Date.now() - 7200000),
+                customer: "Carlos Oliveira",
+                phone: "11977777777",
+                service: "transferencia",
+                originalMessage: "Comprei um carro usado. Como faço a transferência?",
+                aiSuggestion: "Parabéns pelo carro novo! 🚗\n\nPara transferência precisamos:\n\n📄 CRV assinado pelo vendedor\n📄 Seus documentos (RG, CPF, CNH)\n📄 Comprovante de residência\n\nCuidamos de tudo! Valor: R$ 850,00\nInteresse?",
+                status: "approved",
+                correctedResponse: null
+            },
+            {
+                id: 4,
+                date: new Date(Date.now() - 10800000),
+                customer: "Ana Paula",
+                phone: "11966666666",
+                service: "licenciamento",
+                originalMessage: "Meu licenciamento venceu mês passado. Tem multa?",
+                aiSuggestion: "Oi Ana! Licenciamento vencido tem sim multa de R$ 293,47 😔\n\nMas podemos regularizar:\n✅ Pagamos IPVA atrasado\n✅ Pagamos multa\n✅ Emitimos novo licenciamento\n\nQuer que eu calcule o total?",
+                status: "corrected",
+                correctedResponse: "Oi Ana! Infelizmente licenciamento vencido gera multa de R$ 293,47.\n\nMas não se preocupe! Cuidamos de tudo:\n\n✅ Regularizamos IPVA atrasado\n✅ Quitamos a multa\n✅ Emitimos novo licenciamento\n\nQuer que eu faça um orçamento completo pra você?"
+            }
+        ];
 
-    function renderPrices() {
-      const tbody = document.getElementById('prices-table');
-      tbody.innerHTML = SERVICOS.map(s => `
-        <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-          <td class="py-4 font-medium">${s.nome}</td>
-          <td class="py-4 text-right">R$ ${s.preco.toFixed(2)}</td>
-          <td class="py-4 text-right">R$ ${TAXA_DETRAN.toFixed(2)}</td>
-          <td class="py-4 text-right font-bold text-emerald-600">R$ ${(s.preco + TAXA_DETRAN).toFixed(2)}</td>
-        </tr>
-      `).join('');
-    }
+        let trainingData = [];
 
-    function renderMessages(msgs) {
-      const container = document.getElementById('messages-list');
-      const noMsgs = document.getElementById('no-messages');
-      document.getElementById('msgs-count').textContent = `${msgs.length} mensagem${msgs.length !== 1 ? 'ns' : ''}`;
-      
-      if (msgs.length === 0) {
-        container.innerHTML = '';
-        noMsgs.style.display = 'block';
-        return;
-      }
-      
-      noMsgs.style.display = 'none';
-      container.innerHTML = msgs.map(m => {
-        const date = new Date(m.created_at).toLocaleString('pt-BR');
-        const response = m.deepseek_response ? '✅' : '⏳';
-        
-        return `
-          <div class="message-bubble message-user bg-slate-50 p-4 rounded-xl">
-            <div class="flex justify-between items-start mb-2">
-              <span class="font-semibold text-slate-700">${m.phone}</span>
-              <span class="text-xs text-slate-400">${date}</span>
-            </div>
-            <p class="text-slate-600 text-sm">${m.text || '—'}</p>
-            <div class="flex justify-between items-center mt-2">
-              <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">${m.category || 'sem categoria'}</span>
-              <span class="text-xs ${m.deepseek_response ? 'text-green-600' : 'text-amber-600'}">${response} IA</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
+        // Initialize Dashboard
+        function init() {
+            loadMessages();
+            updateStats();
+            loadTrainingExamples();
+            updateMetrics();
+        }
 
-    function renderAIResponses(msgs) {
-      const container = document.getElementById('ai-responses');
-      const noAI = document.getElementById('no-ai');
-      const withAI = msgs.filter(m => m.deepseek_response);
-      document.getElementById('ai-count').textContent = `${withAI.length} resposta${withAI.length !== 1 ? 's' : ''}`;
-      
-      if (withAI.length === 0) {
-        container.innerHTML = '';
-        noAI.style.display = 'block';
-        return;
-      }
-      
-      noAI.style.display = 'none';
-      container.innerHTML = withAI.slice(0, 10).map(m => {
-        const date = new Date(m.created_at).toLocaleString('pt-BR');
-        
-        return `
-          <div class="message-bubble message-ia bg-purple-50 p-4 rounded-xl">
-            <div class="flex justify-between items-start mb-2">
-              <span class="font-semibold text-purple-700">${m.phone}</span>
-              <span class="text-xs text-purple-400">${date}</span>
-            </div>
-            <p class="text-slate-600 text-sm mb-2">"${m.text || '—'}"</p>
-            <div class="bg-white p-3 rounded-lg border border-purple-100">
-              <p class="text-sm text-slate-700">${m.deepseek_response || '—'}</p>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
+        // Switch Tabs
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+        }
 
-    function renderDocuments(docs) {
-      const container = document.getElementById('documents-list');
-      const noDocs = document.getElementById('no-docs');
-      document.getElementById('docs-count').textContent = `${docs.length} documento${docs.length !== 1 ? 's' : ''}`;
-      
-      if (docs.length === 0) {
-        container.innerHTML = '';
-        noDocs.style.display = 'block';
-        return;
-      }
-      
-      noDocs.style.display = 'none';
-      container.innerHTML = docs.slice(0, 10).map(doc => {
-        const icone = doc.tipo === 'image' ? '🖼️' : doc.tipo === 'pdf' ? '📄' : '📎';
-        const size = doc.file_size ? (doc.file_size / 1024).toFixed(1) + ' KB' : '—';
-        const date = new Date(doc.created_at).toLocaleString('pt-BR');
-        const driveLink = doc.drive_url ? `<a href="${doc.drive_url}" target="_blank" class="text-green-600 hover:text-green-700 font-medium flex items-center gap-1">📂 Ver no Drive</a>` : '<span class="text-slate-400">Salvo localmente</span>';
-        
-        return `
-          <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
-            <div class="flex items-center gap-4">
-              <span class="text-3xl">${icone}</span>
-              <div>
-                <p class="font-semibold text-slate-800">${doc.file_name || 'Arquivo sem nome'}</p>
-                <p class="text-sm text-slate-500">${doc.phone} • ${size} • ${date}</p>
-              </div>
-            </div>
-            ${driveLink}
-          </div>
-        `;
-      }).join('');
-    }
+        // Load Messages
+        function loadMessages() {
+            const container = document.getElementById('messages-container');
+            const filterStatus = document.getElementById('filter-status').value;
+            const filterService = document.getElementById('filter-service').value;
+            
+            let filteredMessages = messages.filter(msg => {
+                if (filterStatus !== 'all' && msg.status !== filterStatus) return false;
+                if (filterService !== 'all' && msg.service !== filterService) return false;
+                return true;
+            });
 
-    async function loadAll() {
-      try {
-        const [statsRes, msgsRes, docsRes] = await Promise.all([
-          fetch('/stats'),
-          fetch('/api/mensagens'),
-          fetch('/api/documentos')
-        ]);
-        
-        const stats = await statsRes.json();
-        const msgs = await msgsRes.json();
-        const docs = await docsRes.json();
-        
-        // Stats
-        document.getElementById('stat-messages').textContent = stats.messages || 0;
-        document.getElementById('stat-docs').textContent = stats.docs || 0;
-        document.getElementById('stat-budgets').textContent = stats.budgets || 0;
-        document.getElementById('stat-revenue').textContent = 'R$ ' + (stats.faturamento || 0).toLocaleString('pt-BR');
-        
-        // Messages & AI
-        renderMessages(msgs.slice(0, 20));
-        renderAIResponses(msgs);
-        
-        // Documents
-        renderDocuments(docs);
-      } catch (e) {
-        console.error('Erro ao carregar dados:', e);
-      }
-    }
+            if (filteredMessages.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <h3>Nenhuma mensagem encontrada</h3>
+                        <p>Ajuste os filtros ou aguarde novas mensagens</p>
+                    </div>
+                `;
+                return;
+            }
 
-    async function testMessage() {
-      await fetch('/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: 'Teste de mensagem' })
-      });
-      alert('Mensagem de teste enviada! Aguardando resposta da IA...');
-      setTimeout(loadAll, 2000);
-    }
+            container.innerHTML = filteredMessages.map(msg => createMessageCard(msg)).join('');
+        }
 
-    async function testBudget() {
-      const res = await fetch('/api/orcamento', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: '5511999999999', cliente: 'Teste', servico: 'transferencia' })
-      });
-      const data = await res.json();
-      alert(`Orçamento gerado: R$ ${data.total.toFixed(2)}`);
-      setTimeout(loadAll, 1000);
-    }
+        // Create Message Card
+        function createMessageCard(msg) {
+            const statusBadge = {
+                pending: '<span class="badge badge-pending">⏳ Pendente</span>',
+                approved: '<span class="badge badge-approved">✅ Aprovada</span>',
+                corrected: '<span class="badge badge-corrected">✏️ Corrigida</span>'
+            };
 
-    // Inicializar
-    renderPrices();
-    loadAll();
-    setInterval(loadAll, 30000);
-  </script>
+            const serviceNames = {
+                cnh: 'CNH',
+                veiculo: 'Veículo',
+                multa: 'Multa',
+                licenciamento: 'Licenciamento',
+                transferencia: 'Transferência'
+            };
+
+            const isEditing = msg.status === 'editing';
+            const responseToShow = msg.correctedResponse || msg.aiSuggestion;
+
+            return `
+                <div class="message-card" id="msg-${msg.id}">
+                    <div class="message-header">
+                        <div class="message-info">
+                            ${statusBadge[msg.status] || ''}
+                            <span class="service-tag">${serviceNames[msg.service]}</span>
+                        </div>
+                        <div class="message-date">
+                            ${formatDate(msg.date)}
+                        </div>
+                    </div>
+
+                    <div class="message-section">
+                        <div class="section-label">
+                            💬 Mensagem do Cliente
+                        </div>
+                        <div class="message-text">
+                            ${msg.originalMessage}
+                        </div>
+                    </div>
+
+                    <div class="message-section">
+                        <div class="section-label">
+                            🤖 ${msg.status === 'corrected' ? 'Resposta Corrigida' : 'Resposta Sugerida pela IA'}
+                        </div>
+                        ${isEditing ? `
+                            <textarea class="edit-area" id="edit-${msg.id}">${msg.aiSuggestion}</textarea>
+                        ` : `
+                            <div class="suggestion-text">
+                                ${responseToShow.replace(/\n/g, '<br>')}
+                            </div>
+                        `}
+                    </div>
+
+                    ${msg.status === 'pending' ? `
+                        <div class="btn-group">
+                            <button class="btn btn-approve" onclick="approveMessage(${msg.id})">
+                                ✅ Aprovar Resposta
+                            </button>
+                            <button class="btn btn-edit" onclick="enableEdit(${msg.id})">
+                                ✏️ Editar e Corrigir
+                            </button>
+                            <button class="btn btn-ignore" onclick="ignoreMessage(${msg.id})">
+                                ⏭️ Ignorar
+                            </button>
+                        </div>
+                    ` : isEditing ? `
+                        <div class="btn-group">
+                            <button class="btn btn-save" onclick="saveCorrection(${msg.id})">
+                                💾 Salvar Correção
+                            </button>
+                            <button class="btn btn-cancel" onclick="cancelEdit(${msg.id})">
+                                ❌ Cancelar
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        // Approve Message
+        function approveMessage(id) {
+            const msg = messages.find(m => m.id === id);
+            msg.status = 'approved';
+            
+            trainingData.push({
+                date: new Date(),
+                service: msg.service,
+                customerMessage: msg.originalMessage,
+                learnedResponse: msg.aiSuggestion,
+                type: 'approved'
+            });
+
+            showToast('✅ Resposta aprovada! IA aprendeu com este exemplo.', 'success');
+            loadMessages();
+            updateStats();
+            loadTrainingExamples();
+        }
+
+        // Enable Edit
+        function enableEdit(id) {
+            const msg = messages.find(m => m.id === id);
+            msg.status = 'editing';
+            loadMessages();
+        }
+
+        // Cancel Edit
+        function cancelEdit(id) {
+            const msg = messages.find(m => m.id === id);
+            msg.status = 'pending';
+            loadMessages();
+        }
+
+        // Save Correction
+        function saveCorrection(id) {
+            const msg = messages.find(m => m.id === id);
+            const correctedText = document.getElementById('edit-' + id).value;
+            
+            msg.correctedResponse = correctedText;
+            msg.status = 'corrected';
+            
+            trainingData.push({
+                date: new Date(),
+                service: msg.service,
+                customerMessage: msg.originalMessage,
+                learnedResponse: correctedText,
+                type: 'corrected',
+                originalSuggestion: msg.aiSuggestion
+            });
+
+            showToast('✏️ Correção salva! IA aprendeu com sua expertise.', 'success');
+            loadMessages();
+            updateStats();
+            loadTrainingExamples();
+        }
+
+        // Ignore Message
+        function ignoreMessage(id) {
+            messages = messages.filter(m => m.id !== id);
+            showToast('⏭️ Mensagem ignorada. IA não aprenderá com este exemplo.', 'success');
+            loadMessages();
+            updateStats();
+        }
+
+        // Filter Messages
+        function filterMessages() {
+            loadMessages();
+        }
+
+        // Update Stats
+        function updateStats() {
+            const total = trainingData.length;
+            const approved = trainingData.filter(t => t.type === 'approved').length;
+            const corrected = trainingData.filter(t => t.type === 'corrected').length;
+            const accuracy = total > 0 ? Math.round((approved / total) * 100) : 0;
+
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-approved').textContent = approved;
+            document.getElementById('stat-corrected').textContent = corrected;
+            document.getElementById('stat-accuracy').textContent = accuracy + '%';
+        }
+
+        // Load Training Examples
+        function loadTrainingExamples() {
+            const tbody = document.getElementById('training-examples');
+            
+            if (trainingData.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                            <div class="empty-state-icon">📚</div>
+                            <p>Nenhum exemplo de treinamento ainda</p>
+                            <p style="font-size: 0.9em;">Aprove ou corrija mensagens para criar exemplos</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = trainingData.slice().reverse().map(data => `
+                <tr>
+                    <td>${formatDate(data.date)}</td>
+                    <td><span class="service-tag">${getServiceName(data.service)}</span></td>
+                    <td>${data.customerMessage}</td>
+                    <td>${data.learnedResponse.substring(0, 100)}...</td>
+                    <td>
+                        ${data.type === 'approved' 
+                            ? '<span class="badge badge-approved">✅ Aprovada</span>' 
+                            : '<span class="badge badge-corrected">✏️ Corrigida</span>'}
+                    </td>
+                </tr>
+            `).join('');
+
+            updateTrainingStats();
+        }
+
+        // Update Training Stats
+        function updateTrainingStats() {
+            const container = document.getElementById('training-stats');
+            const services = ['cnh', 'veiculo', 'multa', 'licenciamento', 'transferencia'];
+            
+            const stats = services.map(service => {
+                const count = trainingData.filter(t => t.service === service).length;
+                const percentage = trainingData.length > 0 ? (count / trainingData.length) * 100 : 0;
+                return { service, count, percentage };
+            });
+
+            container.innerHTML = stats.map(stat => `
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>${getServiceName(stat.service)}</span>
+                        <span style="color: var(--text-secondary);">${stat.count} exemplos</span>
+                    </div>
+                    <div class="progress-bar" style="height: 20px;">
+                        <div class="progress-fill" style="width: ${stat.percentage}%; font-size: 0.8em;">
+                            ${stat.percentage > 10 ? Math.round(stat.percentage) + '%' : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Update Metrics
+        function updateMetrics() {
+            const total = trainingData.length;
+            const approved = trainingData.filter(t => t.type === 'approved').length;
+            const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
+
+            const approvalBar = document.getElementById('approval-rate');
+            if (approvalBar) {
+                approvalBar.style.width = approvalRate + '%';
+                approvalBar.textContent = approvalRate + '%';
+            }
+
+            // Services that need more training
+            const servicesContainer = document.getElementById('services-need-training');
+            const services = ['cnh', 'veiculo', 'multa', 'licenciamento', 'transferencia'];
+            const serviceCounts = services.map(service => ({
+                service,
+                count: trainingData.filter(t => t.service === service).length
+            })).sort((a, b) => a.count - b.count);
+
+            if (servicesContainer) {
+                servicesContainer.innerHTML = serviceCounts.slice(0, 3).map(item => `
+                    <div style="padding: 10px 0; border-bottom: 1px solid var(--border);">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>${getServiceName(item.service)}</span>
+                            <span style="color: var(--accent-warning); font-weight: 600;">
+                                ${item.count} exemplos
+                            </span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Helper Functions
+        function formatDate(date) {
+            const now = new Date();
+            const diff = now - date;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            
+            if (minutes < 60) return `${minutes} min atrás`;
+            if (hours < 24) return `${hours}h atrás`;
+            
+            return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function getServiceName(service) {
+            const names = {
+                cnh: 'CNH',
+                veiculo: 'Veículo',
+                multa: 'Multa',
+                licenciamento: 'Licenciamento',
+                transferencia: 'Transferência'
+            };
+            return names[service] || service;
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            const msg = document.getElementById('toast-message');
+            
+            icon.textContent = type === 'success' ? '✅' : '❌';
+            msg.textContent = message;
+            toast.className = 'toast toast-' + type + ' show';
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Initialize on load
+        init();
+
+        // Simulate new messages (for demo purposes)
+        setInterval(() => {
+            // This would be replaced with actual API calls
+            // For demo, we're just updating the UI periodically
+        }, 30000);
+    </script>
 </body>
 </html>
