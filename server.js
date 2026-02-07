@@ -42,13 +42,15 @@ pool.connect((err, client, release) => {
 async function initDatabase() {
   const client = await pool.connect();
   try {
-    // Criar tabela de mensagens se não existir (compatível com estrutura existente)
+    // Criar tabela de mensagens se não existir
     await client.query(`
       CREATE TABLE IF NOT EXISTS mensagens (
         id SERIAL PRIMARY KEY,
         phone VARCHAR(20) NOT NULL,
-        text TEXT NOT NULL,
-        category VARCHAR(50),
+        mensagem TEXT NOT NULL,
+        resposta_ia TEXT,
+        service VARCHAR(50),
+        respondida BOOLEAN DEFAULT false,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
@@ -59,24 +61,29 @@ async function initDatabase() {
         id SERIAL PRIMARY KEY,
         mensagem_id INTEGER,
         phone VARCHAR(20),
-        texto_cliente TEXT NOT NULL,
+        mensagem_cliente TEXT NOT NULL,
         resposta_ia TEXT NOT NULL,
         resposta_corrigida TEXT,
         tipo VARCHAR(20) CHECK (tipo IN ('aprovada', 'corrigida')),
-        categoria VARCHAR(50),
+        service VARCHAR(50),
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
 
     // Criar índices para performance
     await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_mensagens_respondida 
+      ON mensagens(respondida)
+    `);
+
+    await client.query(`
       CREATE INDEX IF NOT EXISTS idx_mensagens_treinadas_tipo 
       ON mensagens_treinadas(tipo)
     `);
 
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_mensagens_treinadas_categoria 
-      ON mensagens_treinadas(categoria)
+      CREATE INDEX IF NOT EXISTS idx_mensagens_treinadas_service 
+      ON mensagens_treinadas(service)
     `);
 
     console.log('✅ Tabelas criadas/verificadas com sucesso!');
@@ -501,20 +508,20 @@ app.get('/api/estatisticas', async (req, res) => {
 // Adiciona nova mensagem para treinamento (webhook ou manual)
 app.post('/api/mensagem', async (req, res) => {
   try {
-    const { phone, text, category } = req.body;
+    const { phone, mensagem, resposta_ia, service } = req.body;
 
-    if (!phone || !text) {
+    if (!phone || !mensagem || !resposta_ia) {
       return res.status(400).json({
         success: false,
-        error: 'Campos obrigatórios: phone, text'
+        error: 'Campos obrigatórios: phone, mensagem, resposta_ia'
       });
     }
 
     const result = await pool.query(
-      `INSERT INTO mensagens (phone, text, category) 
-       VALUES ($1, $2, $3) 
+      `INSERT INTO mensagens (phone, mensagem, resposta_ia, service) 
+       VALUES ($1, $2, $3, $4) 
        RETURNING *`,
-      [phone, text, category || 'geral']
+      [phone, mensagem, resposta_ia, service || 'geral']
     );
 
     res.json({
@@ -530,284 +537,6 @@ app.post('/api/mensagem', async (req, res) => {
       error: 'Erro ao adicionar mensagem',
       details: error.message
     });
-  }
-});
-
-// ============================================
-// API ENDPOINTS DE TREINAMENTO - VERSÃO SIMPLIFICADA
-// ============================================
-
-// GET /api/treinamento/mensagens
-// Lista todas as mensagens para treinamento
-app.get('/api/treinamento/mensagens', async (req, res) => {
-  try {
-    const { limit = 50 } = req.query;
-    
-    const result = await pool.query(
-      `SELECT 
-        m.id,
-        m.phone,
-        m.text as texto_cliente,
-        m.category as categoria,
-        m.created_at,
-        CASE 
-          WHEN mt.id IS NOT NULL THEN mt.tipo
-          ELSE 'pendente'
-        END as status,
-        mt.resposta_ia,
-        mt.resposta_corrigida
-      FROM mensagens m
-      LEFT JOIN mensagens_treinadas mt ON m.id = mt.mensagem_id
-      ORDER BY m.created_at DESC
-      LIMIT $1`,
-      [limit]
-    );
-
-    res.json({
-      success: true,
-      count: result.rows.length,
-      mensagens: result.rows
-    });
-
-  } catch (error) {
-    console.error('Erro ao buscar mensagens:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erro ao buscar mensagens',
-      details: error.message
-    });
-  }
-});
-
-// GET /api/treinamento/estatisticas
-// Retorna estatísticas de treinamento
-app.get('/api/treinamento/estatisticas', async (req, res) => {
-  try {
-    // Total de mensagens treinadas
-    const totalResult = await pool.query(
-      'SELECT COUNT(*) as total FROM mensagens_treinadas'
-    );
-
-    // Aprovadas
-    const aprovadasResult = await pool.query(
-      "SELECT COUNT(*) as aprovadas FROM mensagens_treinadas WHERE tipo = 'aprovada'"
-    );
-
-    // Corrigidas
-    const corridasResult = await pool.query(
-      "SELECT COUNT(*) as corrigidas FROM mensagens_treinadas WHERE tipo = 'corrigida'"
-    );
-
-    // Por categoria
-    const porCategoriaResult = await pool.query(
-      `SELECT categoria, COUNT(*) as count 
-       FROM mensagens_treinadas 
-       GROUP BY categoria 
-       ORDER BY count DESC`
-    );
-
-    // Hoje
-    const hojeResult = await pool.query(
-      `SELECT COUNT(*) as hoje 
-       FROM mensagens_treinadas 
-       WHERE DATE(created_at) = CURRENT_DATE`
-    );
-
-    const total = parseInt(totalResult.rows[0].total);
-    const aprovadas = parseInt(aprovadasResult.rows[0].aprovadas);
-    const corrigidas = parseInt(corridasResult.rows[0].corrigidas);
-    const hoje = parseInt(hojeResult.rows[0].hoje);
-
-    const taxaAprovacao = total > 0 ? Math.round((aprovadas / total) * 100) : 0;
-
-    res.json({
-      success: true,
-      stats: {
-        total,
-        aprovadas,
-        corrigidas,
-        hoje,
-        taxaAprovacao,
-        porCategoria: porCategoriaResult.rows
-      }
-    });
-
-  } catch (error) {
-    console.error('Erro ao buscar estatísticas:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erro ao buscar estatísticas',
-      details: error.message
-    });
-  }
-});
-
-// POST /api/treinamento/aprovar/:id
-// Aprova a resposta sugerida pela IA
-app.post('/api/treinamento/aprovar/:id', async (req, res) => {
-  const client = await pool.connect();
-  
-  try {
-    const { id } = req.params;
-    const { resposta_ia } = req.body;
-
-    if (!resposta_ia) {
-      return res.status(400).json({
-        success: false,
-        error: 'Campo obrigatório: resposta_ia'
-      });
-    }
-
-    await client.query('BEGIN');
-
-    // Buscar a mensagem original
-    const msgResult = await client.query(
-      'SELECT * FROM mensagens WHERE id = $1',
-      [id]
-    );
-
-    if (msgResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({
-        success: false,
-        error: 'Mensagem não encontrada'
-      });
-    }
-
-    const mensagem = msgResult.rows[0];
-
-    // Verificar se já foi treinada
-    const existingTraining = await client.query(
-      'SELECT id FROM mensagens_treinadas WHERE mensagem_id = $1',
-      [id]
-    );
-
-    if (existingTraining.rows.length > 0) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({
-        success: false,
-        error: 'Esta mensagem já foi treinada'
-      });
-    }
-
-    // Inserir no banco de treinamento
-    await client.query(
-      `INSERT INTO mensagens_treinadas 
-       (mensagem_id, phone, texto_cliente, resposta_ia, tipo, categoria) 
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, mensagem.phone, mensagem.text, resposta_ia, 'aprovada', mensagem.category]
-    );
-
-    await client.query('COMMIT');
-
-    res.json({
-      success: true,
-      message: 'Resposta aprovada com sucesso! IA aprendeu com este exemplo.',
-      data: {
-        id,
-        tipo: 'aprovada'
-      }
-    });
-
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Erro ao aprovar resposta:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erro ao aprovar resposta',
-      details: error.message
-    });
-  } finally {
-    client.release();
-  }
-});
-
-// POST /api/treinamento/corrigir/:id
-// Salva a correção feita pelo usuário
-app.post('/api/treinamento/corrigir/:id', async (req, res) => {
-  const client = await pool.connect();
-  
-  try {
-    const { id } = req.params;
-    const { resposta_ia, resposta_corrigida } = req.body;
-
-    if (!resposta_ia || !resposta_corrigida) {
-      return res.status(400).json({
-        success: false,
-        error: 'Campos obrigatórios: resposta_ia, resposta_corrigida'
-      });
-    }
-
-    await client.query('BEGIN');
-
-    // Buscar a mensagem original
-    const msgResult = await client.query(
-      'SELECT * FROM mensagens WHERE id = $1',
-      [id]
-    );
-
-    if (msgResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({
-        success: false,
-        error: 'Mensagem não encontrada'
-      });
-    }
-
-    const mensagem = msgResult.rows[0];
-
-    // Verificar se já foi treinada
-    const existingTraining = await client.query(
-      'SELECT id FROM mensagens_treinadas WHERE mensagem_id = $1',
-      [id]
-    );
-
-    if (existingTraining.rows.length > 0) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({
-        success: false,
-        error: 'Esta mensagem já foi treinada'
-      });
-    }
-
-    // Inserir no banco de treinamento com correção
-    await client.query(
-      `INSERT INTO mensagens_treinadas 
-       (mensagem_id, phone, texto_cliente, resposta_ia, resposta_corrigida, tipo, categoria) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [
-        id, 
-        mensagem.phone, 
-        mensagem.text,
-        resposta_ia, 
-        resposta_corrigida,
-        'corrigida', 
-        mensagem.category
-      ]
-    );
-
-    await client.query('COMMIT');
-
-    res.json({
-      success: true,
-      message: 'Correção salva com sucesso! IA aprendeu com sua expertise.',
-      data: {
-        id,
-        tipo: 'corrigida',
-        resposta_corrigida
-      }
-    });
-
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Erro ao salvar correção:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Erro ao salvar correção',
-      details: error.message
-    });
-  } finally {
-    client.release();
   }
 });
 

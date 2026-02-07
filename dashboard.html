@@ -12,10 +12,25 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --bg-primary: #0f1117;
+            --bg-secondary: #1a1d29;
+            --bg-card: #23263a;
+            --bg-hover: #2d3149;
+            --accent-primary: #667eea;
+            --accent-secondary: #764ba2;
+            --accent-success: #10b981;
+            --accent-warning: #f59e0b;
+            --accent-danger: #ef4444;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --border: #374151;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #0f1117 0%, #1a1d29 100%);
-            color: #f3f4f6;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, #1a1d29 100%);
+            color: var(--text-primary);
             min-height: 100vh;
             padding: 20px;
         }
@@ -27,7 +42,7 @@
 
         /* Header */
         .header {
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
             padding: 30px;
             border-radius: 20px;
             margin-bottom: 30px;
@@ -38,9 +53,17 @@
             font-size: 2.5em;
             font-weight: 700;
             margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
 
-        /* Stats */
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        /* Stats Grid */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -49,10 +72,11 @@
         }
 
         .stat-card {
-            background: #23263a;
+            background: var(--bg-card);
             padding: 25px;
             border-radius: 15px;
-            border: 1px solid #374151;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
         }
@@ -64,7 +88,12 @@
             left: 0;
             width: 100%;
             height: 4px;
-            background: linear-gradient(90deg, #667eea, #764ba2);
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         }
 
         .stat-icon {
@@ -79,17 +108,99 @@
         }
 
         .stat-label {
-            color: #9ca3af;
+            color: var(--text-secondary);
             font-size: 0.9em;
         }
 
-        /* Messages */
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            background: var(--bg-secondary);
+            padding: 10px;
+            border-radius: 15px;
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 12px 25px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 10px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+        }
+
+        .tab:hover:not(.active) {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-select {
+            padding: 12px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 0.95em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .filter-select:hover {
+            border-color: var(--accent-primary);
+        }
+
+        .filter-select option {
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        /* Message Card */
         .message-card {
-            background: #23263a;
-            border: 1px solid #374151;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 15px;
             padding: 25px;
             margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .message-card:hover {
+            border-color: var(--accent-primary);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2);
         }
 
         .message-header {
@@ -98,7 +209,14 @@
             align-items: center;
             margin-bottom: 20px;
             padding-bottom: 15px;
-            border-bottom: 1px solid #374151;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .message-info {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
         }
 
         .badge {
@@ -108,19 +226,24 @@
             font-weight: 600;
         }
 
-        .badge-pendente {
+        .badge-pending {
             background: rgba(245, 158, 11, 0.2);
-            color: #f59e0b;
+            color: var(--accent-warning);
         }
 
-        .badge-aprovada {
+        .badge-approved {
             background: rgba(16, 185, 129, 0.2);
-            color: #10b981;
+            color: var(--accent-success);
         }
 
-        .badge-corrigida {
+        .badge-corrected {
             background: rgba(59, 130, 246, 0.2);
             color: #3b82f6;
+        }
+
+        .message-date {
+            color: var(--text-secondary);
+            font-size: 0.9em;
         }
 
         .message-section {
@@ -129,35 +252,48 @@
 
         .section-label {
             font-weight: 600;
-            color: #667eea;
+            color: var(--accent-primary);
             margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .message-text {
-            background: #1a1d29;
+            background: var(--bg-secondary);
             padding: 15px;
             border-radius: 10px;
             line-height: 1.6;
-            border-left: 3px solid #667eea;
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        .suggestion-text {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            line-height: 1.6;
+            border-left: 3px solid var(--accent-secondary);
         }
 
         .edit-area {
             width: 100%;
-            background: #1a1d29;
-            border: 1px solid #374151;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
             border-radius: 10px;
             padding: 15px;
-            color: #f3f4f6;
+            color: var(--text-primary);
             font-family: inherit;
             font-size: 1em;
             line-height: 1.6;
             resize: vertical;
             min-height: 100px;
+            transition: all 0.3s ease;
         }
 
         .edit-area:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
         /* Buttons */
@@ -178,6 +314,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            font-size: 0.95em;
         }
 
         .btn:disabled {
@@ -190,42 +327,167 @@
             color: white;
         }
 
+        .btn-approve:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+        }
+
         .btn-edit {
             background: linear-gradient(135deg, #3b82f6, #2563eb);
             color: white;
         }
 
+        .btn-edit:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-ignore {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-ignore:hover:not(:disabled) {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
         .btn-save {
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
             color: white;
+        }
+
+        .btn-save:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
 
         .btn-cancel {
             background: transparent;
-            color: #9ca3af;
-            border: 1px solid #374151;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-cancel:hover:not(:disabled) {
+            background: var(--bg-hover);
         }
 
         .btn-refresh {
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
             color: white;
             margin-bottom: 20px;
         }
 
-        /* Loading */
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #9ca3af;
+        .btn-refresh:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
 
-        .spinner {
+        /* Training Examples Table */
+        .examples-table {
+            width: 100%;
+            background: var(--bg-card);
+            border-radius: 15px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .examples-table thead {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+        }
+
+        .examples-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .examples-table td {
+            padding: 15px;
+            border-top: 1px solid var(--border);
+        }
+
+        .examples-table tr:hover {
+            background: var(--bg-hover);
+        }
+
+        /* Charts */
+        .chart-container {
+            background: var(--bg-card);
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .chart-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .progress-bar {
+            background: var(--bg-secondary);
+            height: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: width 0.5s ease;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .btn-group {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        /* Loading Animation */
+        .loading {
             display: inline-block;
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(102, 126, 234, 0.3);
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
-            border-top-color: #667eea;
+            border-top-color: white;
             animation: spin 1s ease-in-out infinite;
         }
 
@@ -233,12 +495,12 @@
             to { transform: rotate(360deg); }
         }
 
-        /* Toast */
+        /* Toast Notification */
         .toast {
             position: fixed;
             bottom: 30px;
             right: 30px;
-            background: #23263a;
+            background: var(--bg-card);
             padding: 20px 25px;
             border-radius: 10px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
@@ -248,6 +510,7 @@
             transform: translateX(400px);
             transition: transform 0.3s ease;
             z-index: 1000;
+            border-left: 4px solid var(--accent-success);
         }
 
         .toast.show {
@@ -255,11 +518,30 @@
         }
 
         .toast-success {
-            border-left: 4px solid #10b981;
+            border-left-color: var(--accent-success);
         }
 
         .toast-error {
-            border-left: 4px solid #ef4444;
+            border-left-color: var(--accent-danger);
+        }
+
+        .service-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            background: rgba(102, 126, 234, 0.2);
+            border-radius: 5px;
+            font-size: 0.85em;
+            color: var(--accent-primary);
+            margin-right: 5px;
+        }
+
+        .phone-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            background: rgba(118, 75, 162, 0.2);
+            border-radius: 5px;
+            font-size: 0.85em;
+            color: var(--accent-secondary);
         }
     </style>
 </head>
@@ -267,11 +549,14 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>🚗 WDespachante - Treinamento IA</h1>
-            <p>Sistema de aprendizado baseado em feedback humano</p>
+            <h1>
+                <span>🚗</span>
+                WDespachante - Treinamento IA
+            </h1>
+            <p>Sistema de aprendizado baseado em feedback humano • Conectado ao PostgreSQL</p>
         </div>
 
-        <!-- Stats -->
+        <!-- Stats Grid -->
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-icon">📨</div>
@@ -295,16 +580,111 @@
             </div>
         </div>
 
-        <!-- Refresh Button -->
-        <button class="btn btn-refresh" onclick="carregarTudo()">
-            🔄 Atualizar Dados
-        </button>
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('inbox')">
+                📥 Caixa de Entrada
+            </button>
+            <button class="tab" onclick="switchTab('training')">
+                🎓 Banco de Treinamento
+            </button>
+            <button class="tab" onclick="switchTab('metrics')">
+                📊 Métricas e Análise
+            </button>
+        </div>
 
-        <!-- Messages Container -->
-        <div id="messages-container">
-            <div class="loading">
-                <div class="spinner"></div>
-                <p style="margin-top: 15px;">Carregando mensagens...</p>
+        <!-- Inbox Tab -->
+        <div id="inbox-tab" class="tab-content active">
+            <button class="btn btn-refresh" onclick="loadMessages()">
+                🔄 Atualizar Mensagens
+            </button>
+            
+            <div class="filters">
+                <select class="filter-select" id="filter-status" onchange="filterMessages()">
+                    <option value="all">Todos os Status</option>
+                    <option value="pending">Pendentes</option>
+                    <option value="approved">Aprovadas</option>
+                    <option value="corrected">Corrigidas</option>
+                </select>
+                <select class="filter-select" id="filter-service" onchange="filterMessages()">
+                    <option value="all">Todos os Serviços</option>
+                    <option value="cnh">CNH</option>
+                    <option value="veiculo">Veículo</option>
+                    <option value="multa">Multa</option>
+                    <option value="licenciamento">Licenciamento</option>
+                    <option value="transferencia">Transferência</option>
+                </select>
+            </div>
+
+            <div id="messages-container">
+                <div class="empty-state">
+                    <div class="empty-state-icon">⏳</div>
+                    <h3>Carregando mensagens...</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Training Tab -->
+        <div id="training-tab" class="tab-content">
+            <button class="btn btn-refresh" onclick="loadTrainingExamples()">
+                🔄 Atualizar Exemplos
+            </button>
+
+            <div class="chart-container">
+                <h3 class="chart-title">📚 Exemplos de Treinamento por Categoria</h3>
+                <div id="training-stats"></div>
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table class="examples-table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Telefone</th>
+                            <th>Serviço</th>
+                            <th>Mensagem do Cliente</th>
+                            <th>Resposta Aprendida</th>
+                            <th>Tipo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="training-examples">
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 40px;">
+                                <div class="loading"></div>
+                                <p style="margin-top: 15px;">Carregando exemplos...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Metrics Tab -->
+        <div id="metrics-tab" class="tab-content">
+            <button class="btn btn-refresh" onclick="updateMetrics()">
+                🔄 Atualizar Métricas
+            </button>
+
+            <div class="stats-grid">
+                <div class="chart-container">
+                    <h3 class="chart-title">🎯 Qualidade das Sugestões</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="approval-rate" style="width: 0%">0%</div>
+                    </div>
+                    <p style="color: var(--text-secondary); margin-top: 10px;">
+                        Porcentagem de respostas aprovadas sem correção
+                    </p>
+                </div>
+
+                <div class="chart-container">
+                    <h3 class="chart-title">📈 Serviços que Precisam de Mais Exemplos</h3>
+                    <div id="services-need-training"></div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <h3 class="chart-title">📊 Distribuição por Serviço</h3>
+                <div id="service-distribution"></div>
             </div>
         </div>
     </div>
@@ -316,279 +696,515 @@
     </div>
 
     <script>
+        // API Base URL - alterar para produção
         const API_URL = window.location.origin;
-        let mensagens = [];
+
+        // State
+        let allMessages = [];
+        let allTraining = [];
         let stats = {};
-        let editingId = null;
+        let editingMessageId = null;
 
         // ============================================
-        // CARREGAR DADOS
+        // INITIALIZATION
         // ============================================
 
-        async function carregarTudo() {
-            await Promise.all([
-                carregarMensagens(),
-                carregarEstatisticas()
-            ]);
+        async function init() {
+            try {
+                await Promise.all([
+                    loadMessages(),
+                    loadStats(),
+                    loadTrainingExamples()
+                ]);
+            } catch (error) {
+                console.error('Erro na inicialização:', error);
+                showToast('❌ Erro ao carregar dados do servidor', 'error');
+            }
         }
 
-        async function carregarMensagens() {
+        // ============================================
+        // LOAD DATA FROM API
+        // ============================================
+
+        async function loadMessages() {
             try {
-                const response = await fetch(`${API_URL}/api/treinamento/mensagens`);
+                const filterService = document.getElementById('filter-service')?.value || 'all';
+                
+                const url = filterService === 'all' 
+                    ? `${API_URL}/api/mensagens-pendentes`
+                    : `${API_URL}/api/mensagens-pendentes?service=${filterService}`;
+
+                const response = await fetch(url);
                 const data = await response.json();
 
                 if (data.success) {
-                    mensagens = data.mensagens || [];
-                    renderizarMensagens();
+                    allMessages = data.messages || [];
+                    displayMessages();
                 } else {
                     throw new Error(data.error || 'Erro ao carregar mensagens');
                 }
             } catch (error) {
-                console.error('Erro:', error);
+                console.error('Erro ao carregar mensagens:', error);
                 document.getElementById('messages-container').innerHTML = `
-                    <div class="loading">
-                        <p style="color: #ef4444;">❌ Erro ao carregar mensagens</p>
-                        <p style="font-size: 0.9em; margin-top: 10px;">${error.message}</p>
+                    <div class="empty-state">
+                        <div class="empty-state-icon">❌</div>
+                        <h3>Erro ao carregar mensagens</h3>
+                        <p>${error.message}</p>
                     </div>
                 `;
             }
         }
 
-        async function carregarEstatisticas() {
+        async function loadStats() {
             try {
-                const response = await fetch(`${API_URL}/api/treinamento/estatisticas`);
+                const response = await fetch(`${API_URL}/api/estatisticas`);
                 const data = await response.json();
 
                 if (data.success) {
                     stats = data.stats;
-                    atualizarStats();
+                    updateStatsDisplay();
                 }
             } catch (error) {
                 console.error('Erro ao carregar estatísticas:', error);
             }
         }
 
+        async function loadTrainingExamples() {
+            try {
+                const response = await fetch(`${API_URL}/api/mensagens-treinadas`);
+                const data = await response.json();
+
+                if (data.success) {
+                    allTraining = data.training || [];
+                    displayTrainingExamples();
+                    updateTrainingStats();
+                }
+            } catch (error) {
+                console.error('Erro ao carregar exemplos:', error);
+                document.getElementById('training-examples').innerHTML = `
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--accent-danger);">
+                            ❌ Erro ao carregar exemplos de treinamento
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
         // ============================================
-        // RENDERIZAR
+        // DISPLAY FUNCTIONS
         // ============================================
 
-        function renderizarMensagens() {
+        function displayMessages() {
             const container = document.getElementById('messages-container');
+            const filterStatus = document.getElementById('filter-status')?.value || 'all';
+            
+            let filteredMessages = allMessages.filter(msg => {
+                if (filterStatus !== 'all' && msg.status !== filterStatus) return false;
+                return true;
+            });
 
-            if (mensagens.length === 0) {
+            if (filteredMessages.length === 0) {
                 container.innerHTML = `
-                    <div class="loading">
-                        <p>📭 Nenhuma mensagem encontrada</p>
-                        <p style="font-size: 0.9em; margin-top: 10px;">Aguardando mensagens do WhatsApp...</p>
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <h3>Nenhuma mensagem encontrada</h3>
+                        <p>Ajuste os filtros ou aguarde novas mensagens do WhatsApp</p>
                     </div>
                 `;
                 return;
             }
 
-            container.innerHTML = mensagens.map(msg => criarCardMensagem(msg)).join('');
+            container.innerHTML = filteredMessages.map(msg => createMessageCard(msg)).join('');
         }
 
-        function criarCardMensagem(msg) {
+        function createMessageCard(msg) {
             const statusBadge = {
-                'pendente': '<span class="badge badge-pendente">⏳ Pendente</span>',
-                'aprovada': '<span class="badge badge-aprovada">✅ Aprovada</span>',
-                'corrigida': '<span class="badge badge-corrigida">✏️ Corrigida</span>'
+                pending: '<span class="badge badge-pending">⏳ Pendente</span>',
+                approved: '<span class="badge badge-approved">✅ Aprovada</span>',
+                corrected: '<span class="badge badge-corrected">✏️ Corrigida</span>'
             };
 
-            const isEditing = editingId === msg.id;
-            const isPendente = msg.status === 'pendente';
+            const serviceNames = {
+                cnh: 'CNH',
+                veiculo: 'Veículo',
+                multa: 'Multa',
+                licenciamento: 'Licenciamento',
+                transferencia: 'Transferência',
+                geral: 'Geral'
+            };
+
+            const isEditing = editingMessageId === msg.id;
+            const responseToShow = msg.correctedResponse || msg.aiSuggestion;
 
             return `
                 <div class="message-card" id="msg-${msg.id}">
                     <div class="message-header">
-                        <div>
+                        <div class="message-info">
                             ${statusBadge[msg.status] || ''}
-                            <span class="badge" style="background: rgba(118, 75, 162, 0.2); color: #764ba2;">
-                                ${msg.categoria || 'Geral'}
-                            </span>
+                            <span class="service-tag">${serviceNames[msg.service] || 'Geral'}</span>
+                            <span class="phone-tag">📱 ${msg.phone}</span>
                         </div>
-                        <div style="color: #9ca3af; font-size: 0.9em;">
-                            ${formatarData(msg.created_at)} • ${msg.phone}
+                        <div class="message-date">
+                            ${formatDate(msg.date)}
                         </div>
                     </div>
 
                     <div class="message-section">
-                        <div class="section-label">💬 Mensagem do Cliente</div>
-                        <div class="message-text">${escaparHtml(msg.texto_cliente)}</div>
+                        <div class="section-label">
+                            💬 Mensagem do Cliente
+                        </div>
+                        <div class="message-text">
+                            ${escapeHtml(msg.originalMessage)}
+                        </div>
                     </div>
 
-                    ${isPendente ? `
-                        <div class="message-section">
-                            <div class="section-label">
-                                ${isEditing ? '✏️ Escreva a Resposta Correta' : '🤖 Escreva a Resposta da IA'}
-                            </div>
-                            <textarea 
-                                class="edit-area" 
-                                id="resposta-${msg.id}"
-                                placeholder="Digite a resposta aqui..."
-                            >${msg.resposta_ia || ''}</textarea>
+                    <div class="message-section">
+                        <div class="section-label">
+                            🤖 ${msg.status === 'corrected' ? 'Resposta Corrigida' : 'Resposta Sugerida pela IA'}
                         </div>
+                        ${isEditing ? `
+                            <textarea class="edit-area" id="edit-${msg.id}">${escapeHtml(msg.aiSuggestion)}</textarea>
+                        ` : `
+                            <div class="suggestion-text">
+                                ${escapeHtml(responseToShow).replace(/\n/g, '<br>')}
+                            </div>
+                        `}
+                    </div>
 
+                    ${msg.status === 'pending' ? `
                         <div class="btn-group">
-                            ${!isEditing ? `
-                                <button class="btn btn-approve" onclick="aprovar(${msg.id})">
-                                    ✅ Aprovar Resposta
-                                </button>
-                                <button class="btn btn-edit" onclick="habilitarEdicao(${msg.id})">
-                                    ✏️ Corrigir Resposta
-                                </button>
-                            ` : `
-                                <button class="btn btn-save" onclick="salvarCorrecao(${msg.id})">
-                                    💾 Salvar Correção
-                                </button>
-                                <button class="btn btn-cancel" onclick="cancelarEdicao()">
-                                    ❌ Cancelar
-                                </button>
-                            `}
+                            <button class="btn btn-approve" onclick="approveMessage(${msg.id})">
+                                ✅ Aprovar Resposta
+                            </button>
+                            <button class="btn btn-edit" onclick="enableEdit(${msg.id})">
+                                ✏️ Editar e Corrigir
+                            </button>
+                            <button class="btn btn-ignore" onclick="ignoreMessage(${msg.id})">
+                                ⏭️ Ignorar
+                            </button>
                         </div>
-                    ` : `
-                        <div class="message-section">
-                            <div class="section-label">
-                                ${msg.status === 'corrigida' ? '✏️ Resposta Corrigida' : '✅ Resposta Aprovada'}
-                            </div>
-                            <div class="message-text">
-                                ${escaparHtml(msg.resposta_corrigida || msg.resposta_ia || 'N/A')}
-                            </div>
+                    ` : isEditing ? `
+                        <div class="btn-group">
+                            <button class="btn btn-save" onclick="saveCorrection(${msg.id})">
+                                💾 Salvar Correção
+                            </button>
+                            <button class="btn btn-cancel" onclick="cancelEdit()">
+                                ❌ Cancelar
+                            </button>
                         </div>
-                    `}
+                    ` : ''}
                 </div>
             `;
         }
 
-        function atualizarStats() {
+        function displayTrainingExamples() {
+            const tbody = document.getElementById('training-examples');
+            
+            if (allTraining.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                            <div class="empty-state-icon">📚</div>
+                            <p>Nenhum exemplo de treinamento ainda</p>
+                            <p style="font-size: 0.9em;">Aprove ou corrija mensagens para criar exemplos</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = allTraining.map(data => {
+                const learnedResponse = data.correctedResponse || data.aiResponse;
+                const serviceNames = {
+                    cnh: 'CNH',
+                    veiculo: 'Veículo',
+                    multa: 'Multa',
+                    licenciamento: 'Licenciamento',
+                    transferencia: 'Transferência',
+                    geral: 'Geral'
+                };
+
+                return `
+                    <tr>
+                        <td>${formatDate(data.date)}</td>
+                        <td><span class="phone-tag">${data.phone}</span></td>
+                        <td><span class="service-tag">${serviceNames[data.service] || 'Geral'}</span></td>
+                        <td>${escapeHtml(data.customerMessage).substring(0, 100)}...</td>
+                        <td>${escapeHtml(learnedResponse).substring(0, 100)}...</td>
+                        <td>
+                            ${data.type === 'aprovada' 
+                                ? '<span class="badge badge-approved">✅ Aprovada</span>' 
+                                : '<span class="badge badge-corrected">✏️ Corrigida</span>'}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateStatsDisplay() {
             document.getElementById('stat-total').textContent = stats.total || 0;
             document.getElementById('stat-approved').textContent = stats.aprovadas || 0;
             document.getElementById('stat-corrected').textContent = stats.corrigidas || 0;
             document.getElementById('stat-accuracy').textContent = (stats.taxaAprovacao || 0) + '%';
         }
 
+        function updateTrainingStats() {
+            const container = document.getElementById('training-stats');
+            const services = ['cnh', 'veiculo', 'multa', 'licenciamento', 'transferencia'];
+            const serviceNames = {
+                cnh: 'CNH',
+                veiculo: 'Veículo',
+                multa: 'Multa',
+                licenciamento: 'Licenciamento',
+                transferencia: 'Transferência'
+            };
+            
+            const stats = services.map(service => {
+                const count = allTraining.filter(t => t.service === service).length;
+                const percentage = allTraining.length > 0 ? (count / allTraining.length) * 100 : 0;
+                return { service, count, percentage };
+            });
+
+            container.innerHTML = stats.map(stat => `
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>${serviceNames[stat.service]}</span>
+                        <span style="color: var(--text-secondary);">${stat.count} exemplos</span>
+                    </div>
+                    <div class="progress-bar" style="height: 20px;">
+                        <div class="progress-fill" style="width: ${stat.percentage}%; font-size: 0.8em;">
+                            ${stat.percentage > 10 ? Math.round(stat.percentage) + '%' : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
         // ============================================
-        // AÇÕES
+        // ACTION FUNCTIONS
         // ============================================
 
-        async function aprovar(id) {
-            const textarea = document.getElementById(`resposta-${id}`);
-            const resposta = textarea.value.trim();
-
-            if (!resposta) {
-                mostrarToast('❌ A resposta não pode estar vazia', 'error');
-                return;
-            }
-
+        async function approveMessage(id) {
             const btn = event.target;
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner" style="width: 16px; height: 16px; border-width: 2px;"></span> Aprovando...';
+            btn.innerHTML = '<span class="loading"></span> Aprovando...';
 
             try {
-                const response = await fetch(`${API_URL}/api/treinamento/aprovar/${id}`, {
+                const response = await fetch(`${API_URL}/api/aprovar/${id}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ resposta_ia: resposta })
+                    headers: { 'Content-Type': 'application/json' }
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
-                    mostrarToast('✅ ' + data.message, 'success');
-                    await carregarTudo();
+                    showToast('✅ ' + data.message, 'success');
+                    await Promise.all([loadMessages(), loadStats(), loadTrainingExamples()]);
                 } else {
-                    throw new Error(data.error);
+                    throw new Error(data.error || 'Erro ao aprovar');
                 }
             } catch (error) {
-                console.error('Erro:', error);
-                mostrarToast('❌ ' + error.message, 'error');
+                console.error('Erro ao aprovar:', error);
+                showToast('❌ ' + error.message, 'error');
                 btn.disabled = false;
                 btn.innerHTML = '✅ Aprovar Resposta';
             }
         }
 
-        function habilitarEdicao(id) {
-            editingId = id;
-            renderizarMensagens();
+        function enableEdit(id) {
+            editingMessageId = id;
+            displayMessages();
         }
 
-        function cancelarEdicao() {
-            editingId = null;
-            renderizarMensagens();
+        function cancelEdit() {
+            editingMessageId = null;
+            displayMessages();
         }
 
-        async function salvarCorrecao(id) {
-            const textarea = document.getElementById(`resposta-${id}`);
-            const resposta_corrigida = textarea.value.trim();
+        async function saveCorrection(id) {
+            const textarea = document.getElementById('edit-' + id);
+            const correctedText = textarea.value.trim();
 
-            if (!resposta_corrigida) {
-                mostrarToast('❌ A correção não pode estar vazia', 'error');
+            if (!correctedText) {
+                showToast('❌ A correção não pode estar vazia', 'error');
                 return;
             }
 
             const btn = event.target;
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner" style="width: 16px; height: 16px; border-width: 2px;"></span> Salvando...';
+            btn.innerHTML = '<span class="loading"></span> Salvando...';
 
             try {
-                const response = await fetch(`${API_URL}/api/treinamento/corrigir/${id}`, {
+                const response = await fetch(`${API_URL}/api/corrigir/${id}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        resposta_ia: 'N/A', // Não temos a resposta original
-                        resposta_corrigida
-                    })
+                    body: JSON.stringify({ correctedResponse: correctedText })
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
-                    mostrarToast('✏️ ' + data.message, 'success');
-                    editingId = null;
-                    await carregarTudo();
+                    showToast('✏️ ' + data.message, 'success');
+                    editingMessageId = null;
+                    await Promise.all([loadMessages(), loadStats(), loadTrainingExamples()]);
                 } else {
-                    throw new Error(data.error);
+                    throw new Error(data.error || 'Erro ao salvar correção');
                 }
             } catch (error) {
-                console.error('Erro:', error);
-                mostrarToast('❌ ' + error.message, 'error');
+                console.error('Erro ao salvar:', error);
+                showToast('❌ ' + error.message, 'error');
                 btn.disabled = false;
                 btn.innerHTML = '💾 Salvar Correção';
             }
         }
 
+        async function ignoreMessage(id) {
+            if (!confirm('Tem certeza que deseja ignorar esta mensagem? A IA não aprenderá com este exemplo.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/mensagem/${id}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('⏭️ ' + data.message, 'success');
+                    await Promise.all([loadMessages(), loadStats()]);
+                } else {
+                    throw new Error(data.error || 'Erro ao ignorar');
+                }
+            } catch (error) {
+                console.error('Erro ao ignorar:', error);
+                showToast('❌ ' + error.message, 'error');
+            }
+        }
+
         // ============================================
-        // HELPERS
+        // UI FUNCTIONS
         // ============================================
 
-        function formatarData(data) {
-            const d = new Date(data);
-            const agora = new Date();
-            const diff = agora - d;
-            const minutos = Math.floor(diff / 60000);
-            const horas = Math.floor(diff / 3600000);
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             
-            if (minutos < 1) return 'Agora';
-            if (minutos < 60) return `${minutos} min atrás`;
-            if (horas < 24) return `${horas}h atrás`;
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+
+            // Load data when switching tabs
+            if (tabName === 'training') {
+                loadTrainingExamples();
+            } else if (tabName === 'metrics') {
+                updateMetrics();
+            }
+        }
+
+        function filterMessages() {
+            displayMessages();
+        }
+
+        async function updateMetrics() {
+            await loadStats();
+            
+            const approvalBar = document.getElementById('approval-rate');
+            if (approvalBar && stats.taxaAprovacao !== undefined) {
+                approvalBar.style.width = stats.taxaAprovacao + '%';
+                approvalBar.textContent = stats.taxaAprovacao + '%';
+            }
+
+            // Services that need more training
+            const servicesContainer = document.getElementById('services-need-training');
+            if (servicesContainer && stats.porServico) {
+                const sortedServices = [...stats.porServico].sort((a, b) => a.count - b.count);
+                const serviceNames = {
+                    cnh: 'CNH',
+                    veiculo: 'Veículo',
+                    multa: 'Multa',
+                    licenciamento: 'Licenciamento',
+                    transferencia: 'Transferência',
+                    geral: 'Geral'
+                };
+
+                servicesContainer.innerHTML = sortedServices.slice(0, 3).map(item => `
+                    <div style="padding: 10px 0; border-bottom: 1px solid var(--border);">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>${serviceNames[item.service] || item.service}</span>
+                            <span style="color: var(--accent-warning); font-weight: 600;">
+                                ${item.count} exemplos
+                            </span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Service distribution
+            const distributionContainer = document.getElementById('service-distribution');
+            if (distributionContainer && stats.porServico) {
+                const serviceNames = {
+                    cnh: 'CNH',
+                    veiculo: 'Veículo',
+                    multa: 'Multa',
+                    licenciamento: 'Licenciamento',
+                    transferencia: 'Transferência',
+                    geral: 'Geral'
+                };
+
+                distributionContainer.innerHTML = stats.porServico.map(item => {
+                    const percentage = stats.total > 0 ? (item.count / stats.total) * 100 : 0;
+                    return `
+                        <div style="margin-bottom: 15px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <span>${serviceNames[item.service] || item.service}</span>
+                                <span style="color: var(--text-secondary);">${item.count} (${Math.round(percentage)}%)</span>
+                            </div>
+                            <div class="progress-bar" style="height: 25px;">
+                                <div class="progress-fill" style="width: ${percentage}%;">
+                                    ${percentage > 10 ? Math.round(percentage) + '%' : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        // ============================================
+        // HELPER FUNCTIONS
+        // ============================================
+
+        function formatDate(date) {
+            const d = new Date(date);
+            const now = new Date();
+            const diff = now - d;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+            
+            if (minutes < 1) return 'Agora';
+            if (minutes < 60) return `${minutes} min atrás`;
+            if (hours < 24) return `${hours}h atrás`;
+            if (days < 7) return `${days}d atrás`;
             
             return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
         }
 
-        function escaparHtml(texto) {
+        function escapeHtml(text) {
             const div = document.createElement('div');
-            div.textContent = texto;
+            div.textContent = text;
             return div.innerHTML;
         }
 
-        function mostrarToast(mensagem, tipo = 'success') {
+        function showToast(message, type = 'success') {
             const toast = document.getElementById('toast');
             const icon = document.getElementById('toast-icon');
             const msg = document.getElementById('toast-message');
             
-            icon.textContent = tipo === 'success' ? '✅' : '❌';
-            msg.textContent = mensagem;
-            toast.className = 'toast toast-' + tipo + ' show';
+            icon.textContent = type === 'success' ? '✅' : '❌';
+            msg.textContent = message;
+            toast.className = 'toast toast-' + type + ' show';
             
             setTimeout(() => {
                 toast.classList.remove('show');
@@ -596,13 +1212,19 @@
         }
 
         // ============================================
-        // INICIALIZAR
+        // INITIALIZE ON LOAD
         // ============================================
 
-        document.addEventListener('DOMContentLoaded', carregarTudo);
+        document.addEventListener('DOMContentLoaded', init);
 
-        // Auto-refresh a cada 30 segundos
-        setInterval(carregarTudo, 30000);
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            const activeTab = document.querySelector('.tab.active').textContent.trim();
+            if (activeTab.includes('Caixa de Entrada')) {
+                loadMessages();
+                loadStats();
+            }
+        }, 30000);
     </script>
 </body>
 </html>
