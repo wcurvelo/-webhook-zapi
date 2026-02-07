@@ -1,0 +1,149 @@
+╔═══════════════════════════════════════════════════════════════╗
+║     🚗 WDespachante - Sistema de Treinamento IA (SIMPLES)   ║
+╚═══════════════════════════════════════════════════════════════╝
+
+📦 INÍCIO RÁPIDO (3 passos)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣  Configure o .env com a senha do PostgreSQL
+    DB_PASSWORD=sua_senha_aqui
+
+2️⃣  Inicie o servidor
+    cd ~/webhook-zapi
+    npm install
+    npm start
+
+3️⃣  Acesse o dashboard
+    http://localhost:3000
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 ADICIONAR MENSAGENS DE TESTE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Com o servidor rodando:
+
+    node adicionar-mensagens.js
+
+Isso adiciona 5 mensagens de exemplo.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 ENDPOINTS CRIADOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Lista Mensagens:
+  GET /api/treinamento/mensagens
+
+Estatísticas:
+  GET /api/treinamento/estatisticas
+
+Aprovar Resposta:
+  POST /api/treinamento/aprovar/:id
+  Body: { "resposta_ia": "texto da resposta" }
+
+Corrigir Resposta:
+  POST /api/treinamento/corrigir/:id
+  Body: {
+    "resposta_ia": "resposta original",
+    "resposta_corrigida": "resposta correta"
+  }
+
+Adicionar Mensagem (webhook):
+  POST /api/mensagem
+  Body: {
+    "phone": "11999999999",
+    "text": "mensagem do cliente",
+    "category": "cnh"
+  }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 ESTRUTURA DO BANCO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Tabela: mensagens
+  - id, phone, text, category, created_at
+
+Tabela: mensagens_treinadas
+  - id, mensagem_id, phone, texto_cliente
+  - resposta_ia, resposta_corrigida
+  - tipo (aprovada/corrigida), categoria, created_at
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 COMO USAR O DASHBOARD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Mensagem aparece com status "Pendente"
+2. Wellington escreve a resposta no campo de texto
+3. Escolhe uma ação:
+   
+   ✅ APROVAR
+   - Clica em "Aprovar Resposta"
+   - IA aprende que essa resposta é boa
+
+   ✏️ CORRIGIR
+   - Clica em "Corrigir Resposta"
+   - Edita o texto
+   - Clica em "Salvar Correção"
+   - IA aprende com a correção
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔗 INTEGRAÇÃO COM WEBHOOK Z-API
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+No seu webhook do WhatsApp, adicione:
+
+app.post('/webhook', async (req, res) => {
+  const { phone, message } = req.body;
+  
+  // Salva no banco para treinamento
+  await fetch('http://localhost:3000/api/mensagem', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      phone,
+      text: message.text,
+      category: detectarCategoria(message.text)
+    })
+  });
+  
+  res.json({ success: true });
+});
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[ ] .env configurado com senha do PostgreSQL
+[ ] npm install executado
+[ ] npm start funcionando
+[ ] http://localhost:3000 abre o dashboard
+[ ] node adicionar-mensagens.js executado
+[ ] Mensagens aparecem no dashboard
+[ ] Consegue aprovar mensagens
+[ ] Consegue corrigir mensagens
+[ ] Estatísticas atualizando
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🐛 PROBLEMAS COMUNS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+❌ "Erro ao conectar ao PostgreSQL"
+   → Verifique DB_PASSWORD no .env
+   → Teste: curl http://localhost:3000/health
+
+❌ "Port 3000 already in use"
+   → Mude no .env: PORT=3001
+
+❌ Dashboard não mostra mensagens
+   → Verifique console do navegador (F12)
+   → Teste: curl http://localhost:3000/api/treinamento/mensagens
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Desenvolvido para Wellington - WDespachante

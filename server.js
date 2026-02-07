@@ -1,339 +1,874 @@
-// server-wdespachante.js - Webhook Z-API + Gemini 2.0 Flash Vision + Google Drive + PostgreSQL
-
+require('dotenv').config();
 const express = require('express');
-const bodyParser = require('body-parser');
 const { Pool } = require('pg');
-const axios = require('axios');
-const fs = require('fs');
+const cors = require('cors');
+const bodyParser = require('body-parser');
 const path = require('path');
-const crypto = require('crypto');
-const { GoogleDriveManager, detectDocumentType } = require('./google-drive');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ==================== POSTGRESQL ====================
+// Middlewares
+app.use(cors());
+app.use(bodyParser.json());
+app.use(express.static('public'));
+
+// PostgreSQL Connection Pool
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgres://user:pass@localhost:5432/wdespachante',
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  port: process.env.DB_PORT || 5432,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
-async function initDB() {
+// Test database connection
+pool.connect((err, client, release) => {
+  if (err) {
+    console.error('❌ Erro ao conectar ao PostgreSQL:', err.stack);
+  } else {
+    console.log('✅ Conectado ao PostgreSQL com sucesso!');
+    release();
+  }
+});
+
+// ============================================
+// DATABASE INITIALIZATION
+// ============================================
+
+async function initDatabase() {
   const client = await pool.connect();
   try {
+    // Criar tabela de mensagens se não existir (compatível com estrutura existente)
     await client.query(`
       CREATE TABLE IF NOT EXISTS mensagens (
-        id SERIAL PRIMARY KEY, phone TEXT NOT NULL, text TEXT, category TEXT,
-        is_client BOOLEAN DEFAULT true, deepseek_response TEXT, gemini_analysis TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS orcamentos (
-        id SERIAL PRIMARY KEY, phone TEXT, cliente TEXT, veiculo TEXT, placa TEXT,
-        servico TEXT, honorario REAL, taxa_detran REAL, total REAL,
-        status TEXT DEFAULT 'gerado', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS documentos (
-        id SERIAL PRIMARY KEY, phone TEXT, message_id TEXT, tipo TEXT, mime_type TEXT,
-        file_name TEXT, file_path TEXT, file_size INTEGER, file_hash TEXT,
-        drive_url TEXT, gemini_analysis TEXT, status TEXT DEFAULT 'recebido',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
+        id SERIAL PRIMARY KEY,
+        phone VARCHAR(20) NOT NULL,
+        text TEXT NOT NULL,
+        category VARCHAR(50),
+        created_at TIMESTAMP DEFAULT NOW()
+      )
     `);
-    console.log('✅ PostgreSQL tables ready');
-  } finally { client.release(); }
-}
-initDB();
 
-// ==================== GOOGLE DRIVE ====================
-const driveManager = new GoogleDriveManager();
+    // Criar tabela de mensagens treinadas
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS mensagens_treinadas (
+        id SERIAL PRIMARY KEY,
+        mensagem_id INTEGER,
+        phone VARCHAR(20),
+        texto_cliente TEXT NOT NULL,
+        resposta_ia TEXT NOT NULL,
+        resposta_corrigida TEXT,
+        tipo VARCHAR(20) CHECK (tipo IN ('aprovada', 'corrigida')),
+        categoria VARCHAR(50),
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
 
-// ==================== GEMINI 2.0 FLASH VISION ====================
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '***REMOVED***';
-const GEMINI_MODEL = 'gemini-2.0-flash-001';
+    // Criar índices para performance
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_mensagens_treinadas_tipo 
+      ON mensagens_treinadas(tipo)
+    `);
 
-async function analyzeWithGemini(imageBuffer, mimeType, fileName) {
-  try {
-    const base64 = imageBuffer.toString('base64');
-    const prompt = `Você é Wellington, dono do WDespachante (18 anos, RJ).
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_mensagens_treinadas_categoria 
+      ON mensagens_treinadas(categoria)
+    `);
 
-Analise este documento e extraia:
-
-1. **Tipo de documento** (CRLV, CNH, RG, CPF, Comprovante, Contrato, etc.)
-2. **Dados extraídos** (nome, CPF, placa, Renavam, etc.)
-3. **Status** (legível, ilegível, incompleto)
-4. **Próximos passos** (o que o cliente precisa enviar)
-5. **Serviço relacionado** (transferência, licenciamento, etc.)
-
-Responda em JSON:
-{
-  "tipo": "crlv",
-  "dados": {"placa": "ABC1234", "renavam": "123456789", "proprietario": "João Silva"},
-  "status": "legivel",
-  "proximo_passo": "Solicitar CRLV verso",
-  "servico": "transferencia",
-  "confianca": 0.95
-}`;
-
-    const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: mimeType, data: base64 } }
-          ]
-        }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 1000 }
-      },
-      { timeout: 30000 }
-    );
-
-    const text = response.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    
-    // Parse JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        return JSON.parse(jsonMatch[0]);
-      } catch (e) {
-        return { raw: text, tipo: detectDocumentType(fileName, mimeType) };
-      }
-    }
-    return { raw: text, tipo: detectDocumentType(fileName, mimeType) };
-  } catch (e) {
-    console.error('Gemini Error:', e.message);
-    return { error: e.message, tipo: detectDocumentType(fileName, mimeType) };
+    console.log('✅ Tabelas criadas/verificadas com sucesso!');
+  } catch (error) {
+    console.error('❌ Erro ao inicializar banco de dados:', error);
+  } finally {
+    client.release();
   }
 }
 
-// ==================== WDESPACHANTE ====================
-const WDESPACHANTE = {
-  nome: 'WDespachante', endereco: 'Av. Treze de Maio, 23 - Centro, RJ',
-  whatsapp: '(21) 96447-4147', experiencia: '18 anos',
-  honorarios: { transferencia: 450, licenciamento_simples: 150, licenciamento_debitos: 250,
-    segunda_via_crv: 450, baixa_gravame: 450, comunicacao_venda: 350 },
-  taxas_detran: { '014-0': 209.78 },
-  payment: { pix: '19869629000109' }
-};
+// ============================================
+// API ENDPOINTS - MENSAGENS PENDENTES
+// ============================================
 
-// ==================== MIDDLEWARE ====================
-app.use(bodyParser.json({ limit: '100mb' }));
-app.use('/uploads', express.static('./uploads'));
+// GET /api/mensagens-pendentes
+// Retorna todas as mensagens que ainda não foram treinadas
+app.get('/api/mensagens-pendentes', async (req, res) => {
+  try {
+    const { service, limit = 50 } = req.query;
+    
+    let query = `
+      SELECT 
+        m.id,
+        m.phone,
+        m.mensagem as "originalMessage",
+        m.resposta_ia as "aiSuggestion",
+        m.service,
+        m.created_at as date,
+        CASE 
+          WHEN mt.id IS NOT NULL THEN 
+            CASE 
+              WHEN mt.tipo = 'aprovada' THEN 'approved'
+              WHEN mt.tipo = 'corrigida' THEN 'corrected'
+            END
+          ELSE 'pending'
+        END as status,
+        mt.resposta_corrigida as "correctedResponse"
+      FROM mensagens m
+      LEFT JOIN mensagens_treinadas mt ON m.id = mt.mensagem_id
+      WHERE m.respondida = false OR mt.id IS NULL
+    `;
 
-// ==================== DASHBOARD ====================
-app.get('/dashboard', (req, res) => {
+    const params = [];
+    
+    if (service && service !== 'all') {
+      query += ` AND m.service = $1`;
+      params.push(service);
+      query += ` ORDER BY m.created_at DESC LIMIT $2`;
+      params.push(limit);
+    } else {
+      query += ` ORDER BY m.created_at DESC LIMIT $1`;
+      params.push(limit);
+    }
+
+    const result = await pool.query(query, params);
+    
+    res.json({
+      success: true,
+      count: result.rows.length,
+      messages: result.rows
+    });
+  } catch (error) {
+    console.error('Erro ao buscar mensagens pendentes:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao buscar mensagens pendentes',
+      details: error.message
+    });
+  }
+});
+
+// ============================================
+// API ENDPOINTS - MENSAGENS TREINADAS
+// ============================================
+
+// GET /api/mensagens-treinadas
+// Retorna todas as mensagens que já foram treinadas (aprovadas ou corrigidas)
+app.get('/api/mensagens-treinadas', async (req, res) => {
+  try {
+    const { service, tipo, limit = 100 } = req.query;
+    
+    let query = `
+      SELECT 
+        mt.id,
+        mt.mensagem_id,
+        mt.phone,
+        mt.mensagem_cliente as "customerMessage",
+        mt.resposta_ia as "aiResponse",
+        mt.resposta_corrigida as "correctedResponse",
+        mt.tipo as type,
+        mt.service,
+        mt.created_at as date
+      FROM mensagens_treinadas mt
+      WHERE 1=1
+    `;
+
+    const params = [];
+    let paramCount = 1;
+
+    if (service && service !== 'all') {
+      query += ` AND mt.service = $${paramCount}`;
+      params.push(service);
+      paramCount++;
+    }
+
+    if (tipo && tipo !== 'all') {
+      query += ` AND mt.tipo = $${paramCount}`;
+      params.push(tipo);
+      paramCount++;
+    }
+
+    query += ` ORDER BY mt.created_at DESC LIMIT $${paramCount}`;
+    params.push(limit);
+
+    const result = await pool.query(query, params);
+    
+    res.json({
+      success: true,
+      count: result.rows.length,
+      training: result.rows
+    });
+  } catch (error) {
+    console.error('Erro ao buscar mensagens treinadas:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao buscar mensagens treinadas',
+      details: error.message
+    });
+  }
+});
+
+// ============================================
+// API ENDPOINTS - APROVAR RESPOSTA
+// ============================================
+
+// POST /api/aprovar/:id
+// Aprova a resposta sugerida pela IA
+app.post('/api/aprovar/:id', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const { id } = req.params;
+    
+    await client.query('BEGIN');
+
+    // Buscar a mensagem original
+    const msgResult = await client.query(
+      'SELECT * FROM mensagens WHERE id = $1',
+      [id]
+    );
+
+    if (msgResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'Mensagem não encontrada'
+      });
+    }
+
+    const mensagem = msgResult.rows[0];
+
+    // Verificar se já foi treinada
+    const existingTraining = await client.query(
+      'SELECT id FROM mensagens_treinadas WHERE mensagem_id = $1',
+      [id]
+    );
+
+    if (existingTraining.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'Esta mensagem já foi treinada'
+      });
+    }
+
+    // Inserir no banco de treinamento
+    await client.query(
+      `INSERT INTO mensagens_treinadas 
+       (mensagem_id, phone, mensagem_cliente, resposta_ia, tipo, service) 
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, mensagem.phone, mensagem.mensagem, mensagem.resposta_ia, 'aprovada', mensagem.service]
+    );
+
+    // Marcar como respondida
+    await client.query(
+      'UPDATE mensagens SET respondida = true WHERE id = $1',
+      [id]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Resposta aprovada com sucesso! IA aprendeu com este exemplo.',
+      data: {
+        id,
+        tipo: 'aprovada'
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Erro ao aprovar resposta:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao aprovar resposta',
+      details: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ============================================
+// API ENDPOINTS - CORRIGIR RESPOSTA
+// ============================================
+
+// POST /api/corrigir/:id
+// Salva a correção feita pelo usuário
+app.post('/api/corrigir/:id', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const { id } = req.params;
+    const { correctedResponse } = req.body;
+
+    if (!correctedResponse || correctedResponse.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Resposta corrigida não pode estar vazia'
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // Buscar a mensagem original
+    const msgResult = await client.query(
+      'SELECT * FROM mensagens WHERE id = $1',
+      [id]
+    );
+
+    if (msgResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'Mensagem não encontrada'
+      });
+    }
+
+    const mensagem = msgResult.rows[0];
+
+    // Verificar se já foi treinada
+    const existingTraining = await client.query(
+      'SELECT id FROM mensagens_treinadas WHERE mensagem_id = $1',
+      [id]
+    );
+
+    if (existingTraining.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'Esta mensagem já foi treinada'
+      });
+    }
+
+    // Inserir no banco de treinamento com correção
+    await client.query(
+      `INSERT INTO mensagens_treinadas 
+       (mensagem_id, phone, mensagem_cliente, resposta_ia, resposta_corrigida, tipo, service) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        id, 
+        mensagem.phone, 
+        mensagem.mensagem, 
+        mensagem.resposta_ia, 
+        correctedResponse,
+        'corrigida', 
+        mensagem.service
+      ]
+    );
+
+    // Marcar como respondida
+    await client.query(
+      'UPDATE mensagens SET respondida = true WHERE id = $1',
+      [id]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Correção salva com sucesso! IA aprendeu com sua expertise.',
+      data: {
+        id,
+        tipo: 'corrigida',
+        correctedResponse
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Erro ao salvar correção:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao salvar correção',
+      details: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ============================================
+// API ENDPOINTS - IGNORAR MENSAGEM
+// ============================================
+
+// DELETE /api/mensagem/:id
+// Marca mensagem como respondida sem treinar
+app.delete('/api/mensagem/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      'UPDATE mensagens SET respondida = true WHERE id = $1 RETURNING *',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Mensagem não encontrada'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Mensagem ignorada com sucesso'
+    });
+
+  } catch (error) {
+    console.error('Erro ao ignorar mensagem:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao ignorar mensagem',
+      details: error.message
+    });
+  }
+});
+
+// ============================================
+// API ENDPOINTS - ESTATÍSTICAS
+// ============================================
+
+// GET /api/estatisticas
+// Retorna estatísticas de treinamento
+app.get('/api/estatisticas', async (req, res) => {
+  try {
+    // Total de mensagens treinadas
+    const totalResult = await pool.query(
+      'SELECT COUNT(*) as total FROM mensagens_treinadas'
+    );
+
+    // Aprovadas
+    const aprovadasResult = await pool.query(
+      "SELECT COUNT(*) as aprovadas FROM mensagens_treinadas WHERE tipo = 'aprovada'"
+    );
+
+    // Corrigidas
+    const corridasResult = await pool.query(
+      "SELECT COUNT(*) as corrigidas FROM mensagens_treinadas WHERE tipo = 'corrigida'"
+    );
+
+    // Por serviço
+    const porServicoResult = await pool.query(
+      `SELECT service, COUNT(*) as count 
+       FROM mensagens_treinadas 
+       GROUP BY service 
+       ORDER BY count DESC`
+    );
+
+    // Hoje
+    const hojeResult = await pool.query(
+      `SELECT COUNT(*) as hoje 
+       FROM mensagens_treinadas 
+       WHERE DATE(created_at) = CURRENT_DATE`
+    );
+
+    const total = parseInt(totalResult.rows[0].total);
+    const aprovadas = parseInt(aprovadasResult.rows[0].aprovadas);
+    const corrigidas = parseInt(corridasResult.rows[0].corrigidas);
+    const hoje = parseInt(hojeResult.rows[0].hoje);
+
+    const taxaAprovacao = total > 0 ? Math.round((aprovadas / total) * 100) : 0;
+
+    res.json({
+      success: true,
+      stats: {
+        total,
+        aprovadas,
+        corrigidas,
+        hoje,
+        taxaAprovacao,
+        porServico: porServicoResult.rows
+      }
+    });
+
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao buscar estatísticas',
+      details: error.message
+    });
+  }
+});
+
+// ============================================
+// API ENDPOINTS - ADICIONAR MENSAGEM (PARA TESTES)
+// ============================================
+
+// POST /api/mensagem
+// Adiciona nova mensagem para treinamento (webhook ou manual)
+app.post('/api/mensagem', async (req, res) => {
+  try {
+    const { phone, text, category } = req.body;
+
+    if (!phone || !text) {
+      return res.status(400).json({
+        success: false,
+        error: 'Campos obrigatórios: phone, text'
+      });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO mensagens (phone, text, category) 
+       VALUES ($1, $2, $3) 
+       RETURNING *`,
+      [phone, text, category || 'geral']
+    );
+
+    res.json({
+      success: true,
+      message: 'Mensagem adicionada com sucesso',
+      data: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Erro ao adicionar mensagem:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao adicionar mensagem',
+      details: error.message
+    });
+  }
+});
+
+// ============================================
+// API ENDPOINTS DE TREINAMENTO - VERSÃO SIMPLIFICADA
+// ============================================
+
+// GET /api/treinamento/mensagens
+// Lista todas as mensagens para treinamento
+app.get('/api/treinamento/mensagens', async (req, res) => {
+  try {
+    const { limit = 50 } = req.query;
+    
+    const result = await pool.query(
+      `SELECT 
+        m.id,
+        m.phone,
+        m.text as texto_cliente,
+        m.category as categoria,
+        m.created_at,
+        CASE 
+          WHEN mt.id IS NOT NULL THEN mt.tipo
+          ELSE 'pendente'
+        END as status,
+        mt.resposta_ia,
+        mt.resposta_corrigida
+      FROM mensagens m
+      LEFT JOIN mensagens_treinadas mt ON m.id = mt.mensagem_id
+      ORDER BY m.created_at DESC
+      LIMIT $1`,
+      [limit]
+    );
+
+    res.json({
+      success: true,
+      count: result.rows.length,
+      mensagens: result.rows
+    });
+
+  } catch (error) {
+    console.error('Erro ao buscar mensagens:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao buscar mensagens',
+      details: error.message
+    });
+  }
+});
+
+// GET /api/treinamento/estatisticas
+// Retorna estatísticas de treinamento
+app.get('/api/treinamento/estatisticas', async (req, res) => {
+  try {
+    // Total de mensagens treinadas
+    const totalResult = await pool.query(
+      'SELECT COUNT(*) as total FROM mensagens_treinadas'
+    );
+
+    // Aprovadas
+    const aprovadasResult = await pool.query(
+      "SELECT COUNT(*) as aprovadas FROM mensagens_treinadas WHERE tipo = 'aprovada'"
+    );
+
+    // Corrigidas
+    const corridasResult = await pool.query(
+      "SELECT COUNT(*) as corrigidas FROM mensagens_treinadas WHERE tipo = 'corrigida'"
+    );
+
+    // Por categoria
+    const porCategoriaResult = await pool.query(
+      `SELECT categoria, COUNT(*) as count 
+       FROM mensagens_treinadas 
+       GROUP BY categoria 
+       ORDER BY count DESC`
+    );
+
+    // Hoje
+    const hojeResult = await pool.query(
+      `SELECT COUNT(*) as hoje 
+       FROM mensagens_treinadas 
+       WHERE DATE(created_at) = CURRENT_DATE`
+    );
+
+    const total = parseInt(totalResult.rows[0].total);
+    const aprovadas = parseInt(aprovadasResult.rows[0].aprovadas);
+    const corrigidas = parseInt(corridasResult.rows[0].corrigidas);
+    const hoje = parseInt(hojeResult.rows[0].hoje);
+
+    const taxaAprovacao = total > 0 ? Math.round((aprovadas / total) * 100) : 0;
+
+    res.json({
+      success: true,
+      stats: {
+        total,
+        aprovadas,
+        corrigidas,
+        hoje,
+        taxaAprovacao,
+        porCategoria: porCategoriaResult.rows
+      }
+    });
+
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao buscar estatísticas',
+      details: error.message
+    });
+  }
+});
+
+// POST /api/treinamento/aprovar/:id
+// Aprova a resposta sugerida pela IA
+app.post('/api/treinamento/aprovar/:id', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const { id } = req.params;
+    const { resposta_ia } = req.body;
+
+    if (!resposta_ia) {
+      return res.status(400).json({
+        success: false,
+        error: 'Campo obrigatório: resposta_ia'
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // Buscar a mensagem original
+    const msgResult = await client.query(
+      'SELECT * FROM mensagens WHERE id = $1',
+      [id]
+    );
+
+    if (msgResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'Mensagem não encontrada'
+      });
+    }
+
+    const mensagem = msgResult.rows[0];
+
+    // Verificar se já foi treinada
+    const existingTraining = await client.query(
+      'SELECT id FROM mensagens_treinadas WHERE mensagem_id = $1',
+      [id]
+    );
+
+    if (existingTraining.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'Esta mensagem já foi treinada'
+      });
+    }
+
+    // Inserir no banco de treinamento
+    await client.query(
+      `INSERT INTO mensagens_treinadas 
+       (mensagem_id, phone, texto_cliente, resposta_ia, tipo, categoria) 
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, mensagem.phone, mensagem.text, resposta_ia, 'aprovada', mensagem.category]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Resposta aprovada com sucesso! IA aprendeu com este exemplo.',
+      data: {
+        id,
+        tipo: 'aprovada'
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Erro ao aprovar resposta:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao aprovar resposta',
+      details: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /api/treinamento/corrigir/:id
+// Salva a correção feita pelo usuário
+app.post('/api/treinamento/corrigir/:id', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const { id } = req.params;
+    const { resposta_ia, resposta_corrigida } = req.body;
+
+    if (!resposta_ia || !resposta_corrigida) {
+      return res.status(400).json({
+        success: false,
+        error: 'Campos obrigatórios: resposta_ia, resposta_corrigida'
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // Buscar a mensagem original
+    const msgResult = await client.query(
+      'SELECT * FROM mensagens WHERE id = $1',
+      [id]
+    );
+
+    if (msgResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'Mensagem não encontrada'
+      });
+    }
+
+    const mensagem = msgResult.rows[0];
+
+    // Verificar se já foi treinada
+    const existingTraining = await client.query(
+      'SELECT id FROM mensagens_treinadas WHERE mensagem_id = $1',
+      [id]
+    );
+
+    if (existingTraining.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        error: 'Esta mensagem já foi treinada'
+      });
+    }
+
+    // Inserir no banco de treinamento com correção
+    await client.query(
+      `INSERT INTO mensagens_treinadas 
+       (mensagem_id, phone, texto_cliente, resposta_ia, resposta_corrigida, tipo, categoria) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        id, 
+        mensagem.phone, 
+        mensagem.text,
+        resposta_ia, 
+        resposta_corrigida,
+        'corrigida', 
+        mensagem.category
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Correção salva com sucesso! IA aprendeu com sua expertise.',
+      data: {
+        id,
+        tipo: 'corrigida',
+        resposta_corrigida
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Erro ao salvar correção:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro ao salvar correção',
+      details: error.message
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ============================================
+// SERVE DASHBOARD
+// ============================================
+
+app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard.html'));
 });
 
-// ==================== APIs ====================
-app.get('/api/mensagens', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM mensagens ORDER BY created_at DESC LIMIT 50');
-    res.json(result.rows);
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/orcamentos', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM orcamentos ORDER BY created_at DESC LIMIT 50');
-    res.json(result.rows);
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/documentos', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM documentos ORDER BY created_at DESC LIMIT 50');
-    res.json(result.rows);
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/stats', async (req, res) => {
-  try {
-    const [m, o, d, f] = await Promise.all([
-      pool.query('SELECT COUNT(*) as c FROM mensagens'),
-      pool.query('SELECT COUNT(*) as c FROM orcamentos'),
-      pool.query('SELECT COUNT(*) as c FROM documentos'),
-      pool.query('SELECT SUM(total) as s FROM orcamentos')
-    ]);
-    res.json({
-      messages: parseInt(m.rows[0].c), budgets: parseInt(o.rows[0].c),
-      docs: parseInt(d.rows[0].c), faturamento: parseFloat(f.rows[0]?.s) || 0
-    });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+// ============================================
+// HEALTH CHECK
+// ============================================
 
 app.get('/health', async (req, res) => {
   try {
-    await pool.query('SELECT 1');
-    res.json({ status: 'healthy', service: 'wdespachante-v2.1-gemini', version: '2.1.0',
-      drive: driveManager.isConfigured(), db: 'postgresql', gemini: '2.0-flash-vision' });
-  } catch (e) { res.status(500).json({ status: 'unhealthy', error: e.message }); }
+    await pool.query('SELECT NOW()');
+    res.json({
+      status: 'ok',
+      database: 'connected',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      database: 'disconnected',
+      error: error.message
+    });
+  }
 });
 
-app.post('/api/orcamento', async (req, res) => {
-  const { phone, cliente, veiculo, placa, servico } = req.body;
-  const honorario = WDESPACHANTE.honorarios[servico] || 450;
-  const taxa = WDESPACHANTE.taxas_detran['014-0'] || 209.78;
+// ============================================
+// START SERVER
+// ============================================
+
+async function startServer() {
   try {
-    const result = await pool.query(
-      'INSERT INTO orcamentos (phone, cliente, veiculo, placa, servico, honorario, taxa_detran, total, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
-      [phone, cliente, veiculo, placa, servico, honorario, taxa, honorario + taxa, 'gerado']);
-    res.json({ id: result.rows[0].id, honorario, taxa, total: honorario + taxa, pix: WDESPACHANTE.payment.pix });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/test', async (req, res) => {
-  await processMessage({ phone: '5511999999999', text: { message: { message: req.body.text || 'Teste' } }, type: 'ReceivedCallback' });
-  res.json({ status: 'test_sent' });
-});
-
-// ==================== WEBHOOK ====================
-app.post('/webhook', async (req, res) => {
-  res.status(200).json({ received: true });
-  processMessage(req.body);
-});
-
-// ==================== PROCESSAMENTO ====================
-async function processMessage(payload) {
-  const phone = payload.phone || payload.sender?.phone || "unknown";
-  const messageType = payload.type || payload.message?.type || "text";
-  console.log('[' + phone + '] Tipo: ' + messageType);
-
-  // Detectar documentos pelo payload real da Z-API
-  let docType = null;
-  let fileUrl = null;
-  
-  if (payload.photo) {
-    docType = 'image';
-    fileUrl = payload.photo;
-  } else if (payload.video) {
-    docType = 'video';
-    fileUrl = payload.video;
-  } else if (payload.document) {
-    docType = 'document';
-    fileUrl = payload.document.url || payload.document;
-  } else if (payload.audio) {
-    docType = 'audio';
-    fileUrl = payload.audio;
+    await initDatabase();
+    
+    app.listen(PORT, () => {
+      console.log(`
+╔════════════════════════════════════════════╗
+║   🚗 WDespachante Training API            ║
+║   ✅ Servidor rodando na porta ${PORT}      ║
+║   📊 Dashboard: http://localhost:${PORT}   ║
+║   🔗 API: http://localhost:${PORT}/api     ║
+╚════════════════════════════════════════════╝
+      `);
+    });
+  } catch (error) {
+    console.error('❌ Erro ao iniciar servidor:', error);
+    process.exit(1);
   }
-
-  // Se detectou documento, processar
-  if (docType && fileUrl) {
-    console.log('📎 Detectado:', docType, 'URL:', fileUrl);
-    await processDocument(payload, phone, docType, fileUrl);
-    return;
-  }
-
-  // Fallback: detectar pelo messageType antigo
-  if (['image', 'document', 'audio', 'video'].includes(messageType)) {
-    await processDocument(payload, phone, messageType, null);
-    return;
-  }
-
-  // Mensagens de texto
-  const text = payload.text?.message?.message || payload.text?.message || payload.text || '';
-  if (payload.isGroup || payload.is_group) {
-    console.log('Grupo, ignorando');
-    return;
-  }
-
-  const cat = classifyMessage(text);
-  try {
-    const result = await pool.query(
-      'INSERT INTO mensagens (phone, text, category, is_client) VALUES ($1, $2, $3, $4) RETURNING id',
-      [phone, text, cat, true]);
-    console.log('MSG #' + result.rows[0].id + ': ' + cat);
-  } catch (e) { console.error(e); }
 }
 
-async function processDocument(payload, phone, docType, fileUrl) {
-  const msg = payload.message || payload;
-  
-  // Usar fileUrl passado como parâmetro OU tentar detectar do payload
-  if (!fileUrl) {
-    fileUrl = msg.mediaUrl || msg.content?.mediaUrl || payload.photo || payload.video || payload.audio || payload.document?.url || payload.document || null;
-  }
-  
-  let fileName = msg.fileName || msg.mediaName || payload.document?.fileName || `arquivo_${Date.now()}`;
-  let mimeType = msg.mimeType || msg.content?.mimeType || payload.document?.mimeType || 'application/octet-stream';
-  
-  // Detectar mimeType pelo tipo de documento
-  if (!mimeType || mimeType === 'application/octet-stream') {
-    if (docType === 'image') mimeType = 'image/jpeg';
-    else if (docType === 'video') mimeType = 'video/mp4';
-    else if (docType === 'audio') mimeType = 'audio/ogg';
-    else if (docType === 'document') mimeType = 'application/pdf';
-  }
-  
-  console.log('📎 Documento - phone:', phone, 'type:', docType, 'url:', fileUrl ? 'SIM' : 'NÃO', 'fileName:', fileName);
+startServer();
 
-  let content = null, filePath = null, fileSize = 0, fileHash = null, driveUrl = null, geminiAnalysis = null;
-
-  // Download
-  if (fileUrl) {
-    try {
-      const response = await axios.get(fileUrl, { responseType: 'arraybuffer', timeout: 30000 });
-      content = Buffer.from(response.data);
-      fileSize = content.length;
-      fileHash = crypto.createHash('md5').update(content).digest('hex');
-      filePath = '/tmp/' + crypto.randomUUID() + path.extname(fileName);
-      fs.writeFileSync(filePath, content);
-      console.log('⬇️ Baixado: ' + (fileSize / 1024).toFixed(1) + 'KB');
-    } catch (e) { console.error('Download error:', e.message); }
-  }
-
-  // Upload para Google Drive
-  const docCategory = detectDocumentType(fileName, mimeType);
-  const driveResult = await driveManager.uploadFile(filePath, fileName, phone, docCategory);
-  if (driveResult.success) driveUrl = driveResult.drive_url || driveResult.local_path;
-
-  // Análise com Gemini 2.0 Flash Vision
-  if (content && (mimeType.startsWith('image/') || mimeType === 'application/pdf')) {
-    console.log('🔍 Analisando com Gemini 2.0 Flash Vision...');
-    geminiAnalysis = await analyzeWithGemini(content, mimeType, fileName);
-    console.log('✅ Gemini:', JSON.stringify(geminiAnalysis).substring(0, 100));
-  }
-
-  // Salvar no PostgreSQL
-  try {
-    await pool.query(
-      'INSERT INTO documentos (phone, message_id, tipo, mime_type, file_name, file_path, file_size, file_hash, drive_url, gemini_analysis, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
-      [phone, msg.id || payload.messageId || crypto.randomUUID(), docType, mimeType, fileName, filePath, fileSize, fileHash, driveUrl, JSON.stringify(geminiAnalysis), 'analisado']);
-    console.log('💾 Salvo no PostgreSQL');
-  } catch (e) { console.error('Erro ao salvar:', e.message); }
-}
-
-function classifyMessage(text) {
-  const lower = text.toLowerCase();
-  if (lower.includes('transfer') || lower.includes('compr')) return 'transferencia';
-  if (lower.includes('ipva') || lower.includes('licenci')) return 'licenciamento';
-  if (lower.includes('multa')) return 'multas';
-  if (lower.includes('crlv') || lower.includes('documento')) return 'crlv';
-  return 'consulta';
-}
-
-// ==================== INICIAR ====================
-app.listen(PORT, () => {
-  console.log('WDespachante v2.1 + Gemini 2.0 Flash Vision');
-  console.log('Porta: ' + PORT);
-  console.log('Banco: PostgreSQL (persistente!)');
-  console.log('Gemini: 2.0 Flash Vision (análise de imagens)');
-  console.log('Drive: ' + (driveManager.isConfigured() ? 'Ativo' : 'Inativo'));
-});
-
-module.exports = { app, pool };
-
-// ==================== API MESSAGES ====================
-app.get('/api/messages', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM mensagens ORDER BY id DESC LIMIT 50');
-    res.json(result.rows);
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/messages/:id', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM mensagens WHERE id = $1', [req.params.id]);
-    res.json(result.rows[0] || { error: 'Not found' });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+// Handle graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('\n🛑 Encerrando servidor...');
+  await pool.end();
+  process.exit(0);
 });
