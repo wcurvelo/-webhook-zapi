@@ -106,9 +106,9 @@ app.get('/api/mensagens-pendentes', async (req, res) => {
       SELECT 
         m.id,
         m.phone,
-        m.mensagem as "originalMessage",
-        m.resposta_ia as "aiSuggestion",
-        m.service,
+        m.text as "originalMessage",
+        COALESCE(m.deepseek_response, 'Sem sugestão') as "aiSuggestion",
+        m.category,
         m.created_at as date,
         CASE 
           WHEN mt.id IS NOT NULL THEN 
@@ -121,13 +121,13 @@ app.get('/api/mensagens-pendentes', async (req, res) => {
         mt.resposta_corrigida as "correctedResponse"
       FROM mensagens m
       LEFT JOIN mensagens_treinadas mt ON m.id = mt.mensagem_id
-      WHERE m.respondida = false OR mt.id IS NULL
+      WHERE 1=1 OR mt.id IS NULL
     `;
 
     const params = [];
     
     if (service && service !== 'all') {
-      query += ` AND m.service = $1`;
+      query += ` AND m.category = $1`;
       params.push(service);
       query += ` ORDER BY m.created_at DESC LIMIT $2`;
       params.push(limit);
@@ -262,7 +262,7 @@ app.post('/api/aprovar/:id', async (req, res) => {
       `INSERT INTO mensagens_treinadas 
        (mensagem_id, phone, mensagem_cliente, resposta_ia, tipo, service) 
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, mensagem.phone, mensagem.mensagem, mensagem.resposta_ia, 'aprovada', mensagem.service]
+      [id, mensagem.phone, mensagem.mensagem, mensageCOALESCE(m.deepseek_response, 'Sem sugestão'), 'aprovada', mensagem.category]
     );
 
     // Marcar como respondida
@@ -356,10 +356,10 @@ app.post('/api/corrigir/:id', async (req, res) => {
         id, 
         mensagem.phone, 
         mensagem.mensagem, 
-        mensagem.resposta_ia, 
+        mensageCOALESCE(m.deepseek_response, 'Sem sugestão'), 
         correctedResponse,
         'corrigida', 
-        mensagem.service
+        mensagem.category
       ]
     );
 
