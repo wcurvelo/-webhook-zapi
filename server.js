@@ -259,6 +259,14 @@ async function initDatabase() {
       
       CREATE INDEX IF NOT EXISTS idx_mensagens_phone ON mensagens(phone);
       CREATE INDEX IF NOT EXISTS idx_documentos_phone ON documentos(phone);
+      
+      -- Add gemini_analysis column if not exists
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documentos' AND column_name='gemini_analysis') THEN
+          ALTER TABLE documentos ADD COLUMN gemini_analysis TEXT;
+        END IF;
+      END $$;
     `);
     console.log('✅ Tabelas criadas/verificadas!');
   } catch (e) {
