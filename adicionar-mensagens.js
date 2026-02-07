@@ -1,5 +1,5 @@
 // Script de Teste - Adiciona mensagens de exemplo
-const API_URL = 'http://localhost:3000';
+const API_URL = 'https://webhook-zapi-9i2x.onrender.com';
 
 const mensagensExemplo = [
     {
