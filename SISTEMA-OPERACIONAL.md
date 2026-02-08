@@ -11,8 +11,8 @@ Data: 2026-02-04
 - ✅ **Auto-deploy** configurado com GitHub
 
 ### 2. **Z-API Configuração**
-- ✅ **Instância conectada:** `***REMOVED***`
-- ✅ **Token configurado:** `***REMOVED***`
+- ✅ **Instância conectada:** `3EA8419176C001C856E02A31285F8919`
+- ✅ **Token configurado:** `C2D28FAD4507E2847258E594`
 - ✅ **Webhook URL definida:** `https://webhook-zapi-9i2x.onrender.com/webhook`
 - ✅ **Status:** CONECTADO ✅
 - ✅ **Plano:** PAGO (renova 22/fev/2026)

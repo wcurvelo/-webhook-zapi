@@ -3,9 +3,9 @@ const axios = require('axios');
 
 // Credenciais Z-API (do arquivo de configuração)
 const ZAPI_CONFIG = {
-  INSTANCE_ID: '***REMOVED***',
-  TOKEN: '***REMOVED***',
-  API_URL: 'https://api.z-api.io/instances/***REMOVED***/token/***REMOVED***'
+  INSTANCE_ID: process.env.ZAPI_INSTANCE_ID,
+  TOKEN: process.env.ZAPI_TOKEN,
+  API_URL: `https://api.z-api.io/instances/${process.env.ZAPI_INSTANCE_ID}/token/${process.env.ZAPI_TOKEN}`
 };
 
 /**
@@ -40,7 +40,7 @@ async function sendZAPIMessage(to, message, options = {}) {
     const response = await axios.post(ZAPI_CONFIG.API_URL + '/send-text', payload, {
       headers: {
         'Content-Type': 'application/json',
-        'Client-Token': '***REMOVED***'
+        'Client-Token': process.env.CLIENT_TOKEN
       },
       timeout: 10000 // 10 segundos
     });
@@ -84,7 +84,7 @@ async function checkZAPIStatus() {
   try {
     const response = await axios.get(ZAPI_CONFIG.API_URL + '/status', {
       headers: {
-        'Client-Token': '***REMOVED***'
+        'Client-Token': process.env.CLIENT_TOKEN
       },
       timeout: 5000
     });

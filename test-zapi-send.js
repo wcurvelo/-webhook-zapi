@@ -2,9 +2,9 @@
 const axios = require('axios');
 
 const ZAPI_CONFIG = {
-  INSTANCE_ID: '***REMOVED***',
-  TOKEN: '***REMOVED***',
-  API_URL: 'https://api.z-api.io/instances/***REMOVED***/token/***REMOVED***'
+  INSTANCE_ID: process.env.ZAPI_INSTANCE_ID,
+  TOKEN: process.env.ZAPI_TOKEN,
+  API_URL: `https://api.z-api.io/instances/${process.env.ZAPI_INSTANCE_ID}/token/${process.env.ZAPI_TOKEN}`
 };
 
 async function testSendMessage() {
@@ -38,7 +38,7 @@ async function testSendMessage() {
       {
         headers: {
           'Content-Type': 'application/json',
-          'Client-Token': '***REMOVED***'
+          'Client-Token': process.env.CLIENT_TOKEN
         },
         timeout: 15000
       }

@@ -20,16 +20,16 @@ const DB_PATH = process.env.DB_PATH || '/tmp/clientes.db';
 
 // Configuração Z-API
 const ZAPI_CONFIG = {
-  INSTANCE_ID: process.env.ZAPI_INSTANCE_ID || '***REMOVED***',
-  TOKEN: process.env.ZAPI_TOKEN || '***REMOVED***',
-  API_URL: process.env.ZAPI_API_URL || 'https://api.z-api.io/instances/***REMOVED***/token/***REMOVED***',
-  CLIENT_TOKEN: process.env.ZAPI_CLIENT_TOKEN || '***REMOVED***',
+  INSTANCE_ID: process.env.ZAPI_INSTANCE_ID,
+  TOKEN: process.env.ZAPI_TOKEN,
+  API_URL: process.env.ZAPI_API_URL || `https://api.z-api.io/instances/${process.env.ZAPI_INSTANCE_ID}/token/${process.env.ZAPI_TOKEN}`,
+  CLIENT_TOKEN: process.env.ZAPI_CLIENT_TOKEN,
   RESPONSE_ENABLED: true // ATIVADO para resposta automática
 };
 
 // Configuração Gemini
 const GEMINI_CONFIG = {
-  API_KEY: process.env.GEMINI_API_KEY || '***REMOVED***',
+  API_KEY: process.env.GEMINI_API_KEY,
   MODEL: 'gemini-2.0-flash',
   ENABLED: true, // Ativar/desativar Gemini
   ANALISES_PATH: '/home/wcurvelo/railway-project/sistema-clientes/analises_gemini/',

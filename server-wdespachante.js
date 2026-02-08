@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 
 // ==================== CONFIGURAÇÕES ====================
 const DB_PATH = process.env.DB_PATH || '/tmp/clientes.db';
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '***REMOVED***';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = 'gemini-2.0-flash';
 const AGENT_SCRIPT = process.env.AGENT_SCRIPT || '/home/wcurvelo/.openclaw/agents/wdespachante/wdespachante_agent.py';
 

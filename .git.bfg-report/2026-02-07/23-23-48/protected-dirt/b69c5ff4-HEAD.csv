@@ -1,0 +1,16 @@
+6161e5f901ed6db5bbcdd3d79e39b83bd032f359,MODIFY,regular-file,GUIDE-RENDER-DEPLOY.md,5858,74;85
+075c44cf6d3d5779e2f702f44e850dfcecd74f5e,MODIFY,regular-file,SISTEMA-OPERACIONAL.md,3869,14-15
+15416ca240cc5bad221a1d9c6ce9f92eaaca9677,MODIFY,regular-file,server-auto-enabled.js,28337,18-21
+15416ca240cc5bad221a1d9c6ce9f92eaaca9677,MODIFY,regular-file,server-backup-auto-enabled.js,28337,18-21
+053aee6a2e979498410bf58d49c83e040b2b5cf0,MODIFY,regular-file,server-backup-classify.js,47341,18-20;25
+9555946fcfd08dbaaba84d387b5333b04fe714b8,MODIFY,regular-file,server-backup-dashboard.js,11096,18-20;25
+63fbec497d3f79871ab9c679250c0786b8c12069,MODIFY,regular-file,server-backup-learning.js,23993,18-20;25
+2e27ee572a3c136685f5a1d6671e892c87c51959,MODIFY,regular-file,server-backup-v2.1.js,21663,13
+63fbec497d3f79871ab9c679250c0786b8c12069,MODIFY,regular-file,server-classify.js,23993,18-20;25
+433870a698f3eae696224dc9d0ab87c6baa3e34b,MODIFY,regular-file,server-com-gemini.js,23069,23-26;32
+fcfc01c128c8ee27cdb3a06b227bace66368c989,MODIFY,regular-file,server-com-resposta.js,26187,18-21
+aefcae4f601e2f5a91dbcc7019eb76110cf04853,MODIFY,regular-file,server-learning.js,23463,15;465
+b178bef82d61b6c50cabaece52ff85f45e03cfbc,MODIFY,regular-file,server-wdespachante.js,18027,16
+9555946fcfd08dbaaba84d387b5333b04fe714b8,MODIFY,regular-file,server-zapi-fix.js,11096,18-20;25
+f774d5261d5ecfc7f214b660510e54e188c25531,MODIFY,regular-file,test-zapi-send.js,2551,5-7;41
+2220579823ef279f4b556e7a10741fb60524e5c8,MODIFY,regular-file,zapi-sender.js,4148,6-8;43;87

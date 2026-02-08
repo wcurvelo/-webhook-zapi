@@ -15,10 +15,10 @@ const DB_PATH = process.env.DB_PATH || '/tmp/clientes.db';
 
 // Configuração Z-API
 const ZAPI_CONFIG = {
-  INSTANCE_ID: process.env.ZAPI_INSTANCE_ID || '***REMOVED***',
-  TOKEN: process.env.ZAPI_TOKEN || '***REMOVED***',
-  API_URL: process.env.ZAPI_API_URL || 'https://api.z-api.io/instances/***REMOVED***/token/***REMOVED***',
-  CLIENT_TOKEN: process.env.ZAPI_CLIENT_TOKEN || '***REMOVED***',
+  INSTANCE_ID: process.env.ZAPI_INSTANCE_ID,
+  TOKEN: process.env.ZAPI_TOKEN,
+  API_URL: process.env.ZAPI_API_URL || `https://api.z-api.io/instances/${process.env.ZAPI_INSTANCE_ID}/token/${process.env.ZAPI_TOKEN}`,
+  CLIENT_TOKEN: process.env.ZAPI_CLIENT_TOKEN,
   RESPONSE_ENABLED: process.env.RESPONSE_ENABLED === 'true' || false // Por padrão desabilitado
 };
 

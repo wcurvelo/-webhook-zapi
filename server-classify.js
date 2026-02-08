@@ -15,14 +15,14 @@ const DB_PATH = process.env.DB_PATH || '/tmp/clientes.db';
 
 // Configuração Z-API
 const ZAPI_CONFIG = {
-  INSTANCE_ID: process.env.ZAPI_INSTANCE_ID || '***REMOVED***',
-  TOKEN: process.env.ZAPI_TOKEN || '***REMOVED***',
-  CLIENT_TOKEN: process.env.CLIENT_TOKEN || '***REMOVED***'
+  INSTANCE_ID: process.env.ZAPI_INSTANCE_ID,
+  TOKEN: process.env.ZAPI_TOKEN,
+  CLIENT_TOKEN: process.env.CLIENT_TOKEN
 };
 
 // Configuração Gemini
 const GEMINI_CONFIG = {
-  API_KEY: process.env.GEMINI_API_KEY || '***REMOVED***',
+  API_KEY: process.env.GEMINI_API_KEY,
   MODEL: 'gemini-2.0-flash',
   ENABLED: true,
   ANALISES_PATH: '/tmp/analises_gemini/',

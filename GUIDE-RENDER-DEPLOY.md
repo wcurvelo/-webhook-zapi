@@ -71,7 +71,7 @@ No serviço criado, vá para "Environment":
 
 ### 3.2 Configurar webhook na Z-API
 1. Acesse https://panel.z-api.io
-2. Vá para sua instância (***REMOVED***)
+2. Vá para sua instância (3EA8419176C001C856E02A31285F8919)
 3. Em "Webhook", configure:
    - **URL:** `https://webhook-zapi.onrender.com/webhook`
    - **Método:** `POST`
@@ -82,7 +82,7 @@ No serviço criado, vá para "Environment":
 Volte ao Render, adicione variáveis:
 ```
 ZAPI_TOKEN=C2D28FAD4507E284725
-ZAPI_INSTANCE=***REMOVED***
+ZAPI_INSTANCE=3EA8419176C001C856E02A31285F8919
 ```
 
 **IMPORTANTE:** Marque como "Secret" (Render mascarará o valor)

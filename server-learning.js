@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 
 // Configuração
 const DB_PATH = process.env.DB_PATH || '/tmp/clientes.db';
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '***REMOVED***';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = 'gemini-2.0-flash';
 
 // Seu perfil de atendimento (vai sendo aprendido)
@@ -462,7 +462,7 @@ app.post('/test', (req, res) => {
     phone: req.body.phone || '5511999999999',
     text: { message: req.body.text || 'Teste' },
     type: 'ReceivedCallback',
-    instanceId: '***REMOVED***'
+    instanceId: process.env.ZAPI_INSTANCE_ID
   };
   processMessage(payload);
   res.json({ status: 'test_received', payload });
